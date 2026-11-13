@@ -1,0 +1,19 @@
+// Probe answers of `listen` over its lifetime.
+digraph listen_probes {
+  graph [rankdir=LR, fontname="Helvetica", fontsize=11, nodesep=0.4, ranksep=0.6, pad=0.3,
+         label="listen: lifecycle and Kubernetes probe answers", labelloc=t];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, fillcolor="#eef3fb", color="#4a6fa5"];
+  edge  [fontname="Helvetica", fontsize=9, color="#555555"];
+
+  starting [label="starting\nbind measured port,\nread context,\nbind control port\n\n/startup 503\n/ready 503\n/live 200"];
+  serving  [label="serving\n\n/startup 200\n/ready 200\n/live 200 (503 if a\nthread is stalled > 5 s)", fillcolor="#e3f2e1", color="#2e7d32"];
+  stopping [label="stopping\n\n/startup 200\n/ready 503\n/live 200", fillcolor="#fff8e1", color="#b08900"];
+  gone     [label="exit 143 / 130", shape=octagon, fillcolor="#fdecea", color="#b23b3b"];
+  refused  [label="exit 3\nport cannot be bound", shape=octagon, fillcolor="#fdecea", color="#b23b3b"];
+
+  starting -> serving  [label="both ports bound"];
+  starting -> refused  [label="bind failed"];
+  serving  -> stopping [label="first SIGTERM\nor SIGINT"];
+  stopping -> gone     [label="stop accepting,\nclose, stop server"];
+  stopping -> gone     [label="second signal:\nexit at once", style=dashed];
+}

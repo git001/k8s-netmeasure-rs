@@ -4,8 +4,56 @@ Reproducible TCP connect-latency measurement in Kubernetes and OpenShift.
 
 **Status: milestone 3 of the [Phase 1 implementation plan](docs/design/2026-11-13_phase1-design/11-implementation-plan.md)
 in progress:** `probe`, `selftest`, `listen` and `run` (`--node-context-from` and the
-shutdown deadline follow). `report` follows. The design is in
+shutdown deadline follow). `report` follows. The [user guide](docs/user/README.md) explains how to use the tool, with diagrams of
+the flows. The design is in
 [docs/design/2026-11-13_phase1-design/](docs/design/2026-11-13_phase1-design/README.md).
+
+## Why this tool exists
+
+Many cluster problems show up first as slow or failing **new TCP connections**
+between nodes: timeouts in short-lived client connections, retries, a p99 that
+drifts after a node-pool change. They are hard to pin down, because the effect sits
+in the tail of the distribution, is noisy, and depends on things that are invisible
+from Kubernetes: the NIC hardware of the host, its driver and ring sizes, the
+kernel, CPU throttling of the measuring pod. A single `curl` loop or a dashboard
+average cannot tell a real difference from noise or from a disturbed measurement.
+
+The tool is built to answer two questions reproducibly, with evidence that holds up
+in a support case:
+
+1. **Do nodes with different NIC hardware behave differently?** The same instance
+   type can run on hosts with different NIC families, and a virtual function can
+   disappear and come back during host maintenance. The tool observes the NIC path
+   on every node and around every measurement cycle instead of assuming it.
+2. **Does a change make it better, worse or equivalent?** For example a test
+   kernel, a driver update or a new node image, measured before and after with the
+   same parameters and compared with confidence intervals (`report`, follows).
+
+Existing tools answer different questions. k8s-netperf runs throughput and
+request/response benchmarks and averages percentiles; goldpinger times HTTP round
+trips in whole milliseconds and probes on the port it measures. Neither measures the
+TCP handshake itself at the precision needed for a p99 comparison. The evaluation is
+in [docs/design](docs/design/2026-11-13_k8s-netperf-step0-evaluation.md).
+
+What `k8s-netmeasure` does differently:
+
+- **measures `connect()` directly**, in nanoseconds with a monotonic clock, on a
+  dedicated thread that no signal and no log call can disturb;
+- **paces the connects** at a fixed interval, independent of the answers, with a
+  **loopback control** in every run that separates local effects from network
+  effects;
+- **checks every cycle** for what would falsify it (CPU throttling, SYN drops at
+  either listener, a restarted target, a changed NIC path) and marks it invalid
+  instead of silently averaging it in;
+- **records the context** (kernel, CPU, NIC driver and ring sizes, cgroup limits) of
+  both sides with every result, so two result files can be checked for comparability;
+- **verifies its own assumptions on the target kernel** (`selftest`) before the first
+  measurement;
+- needs **no API access and no privileges** for the measurement itself, and ships as
+  a signed image and as a static binary for ad hoc use.
+
+It is not a monitoring system (metrics follow in a later phase), not a throughput
+benchmark, and it does not measure latency on established connections.
 
 ## Subcommands so far
 

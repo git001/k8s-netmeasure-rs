@@ -1,0 +1,25 @@
+// Slot schedule: round-robin over targets, every n-th slot on the loopback control,
+// cycles cut by counted samples per target.
+digraph slots {
+  graph [rankdir=LR, fontname="Helvetica", fontsize=11, nodesep=0.1, ranksep=0.15, pad=0.3,
+         label="Slot schedule with 2 targets and --loopback-every 4 (one slot every --interval)", labelloc=t];
+  node  [shape=box, style="filled", fontname="Helvetica", fontsize=9, width=0.55, height=0.4, fixedsize=true];
+  edge  [arrowsize=0.4, color="#999999"];
+
+  node [fillcolor="#e3f2e1", color="#2e7d32"];  s0 [label="A"]; s1 [label="B"]; s2 [label="A"];
+  node [fillcolor="#f4f4f4", color="#777777"];  s3 [label="lo"];
+  node [fillcolor="#e3f2e1", color="#2e7d32"];  s4 [label="B"]; s5 [label="A"]; s6 [label="B"];
+  node [fillcolor="#f4f4f4", color="#777777"];  s7 [label="lo"];
+  node [fillcolor="#e3f2e1", color="#2e7d32"];  s8 [label="A"]; s9 [label="B"];
+  dots [label="…", shape=plaintext, style="", width=0.3];
+  s0 -> s1 -> s2 -> s3 -> s4 -> s5 -> s6 -> s7 -> s8 -> s9 -> dots;
+
+  legend [shape=plaintext, style="", fixedsize=false, width=4, fontsize=9, label=<
+    <table border="0" cellborder="0" cellspacing="2">
+      <tr><td align="left">A, B: real targets, round-robin; lo: own loopback listener (local control)</td></tr>
+      <tr><td align="left">first --warmup samples per target: stored, flagged, excluded from statistics</td></tr>
+      <tr><td align="left">a cycle ends after its share of counted samples per target (--samples / cycles)</td></tr>
+      <tr><td align="left">overrun: the next slot starts at once and re-anchors; missed slots are never made up</td></tr>
+    </table>>];
+  dots -> legend [style=invis];
+}

@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- README section "Why this tool exists": the problem, the two questions the tool
+  answers, how it differs from existing tools, and what it is not.
+- User guide in `docs/user/`: concepts, `selftest` and `probe`, `listen`, `run` with
+  the result file and exit codes, running in Kubernetes and OpenShift (pod types,
+  permissions, security), troubleshooting. Seven Graphviz diagrams (`*.dot` sources
+  with rendered SVG) for the overview, the workflow, the `run` lifecycle, the slot
+  schedule, cycle validity, the `listen` lifecycle and the threads.
 - `run` against `listen` targets: the control port is the target's IP and
   `--target-control-port` (default 17701); `/v1/info` and `/v1/context` at start
   (no answer: exit 3), `/v1/snapshot` before and after every cycle over one

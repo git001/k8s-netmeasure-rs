@@ -1,0 +1,45 @@
+// What `run` does from start to exit.
+digraph run_lifecycle {
+  graph [rankdir=TB, fontname="Helvetica", fontsize=11, nodesep=0.35, ranksep=0.32, pad=0.3,
+         label="run: start checks, cycle loop, result file, exit code", labelloc=t];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, fillcolor="#eef3fb", color="#4a6fa5"];
+  edge  [fontname="Helvetica", fontsize=9, color="#555555"];
+
+  start   [label="start", shape=circle, width=0.5, fillcolor="#dfe9d8", color="#2e7d32"];
+  config  [label="parse flags and K8S_NETMEASURE_*\nplan slots and cycles"];
+  e2      [label="exit 2\n(usage)", shape=octagon, fillcolor="#fdecea", color="#b23b3b"];
+  checks  [label="start checks:\noutput directory exists?\ncgroup v2 readable, quota ≥ 500m?\n(--no-cgroup-check skips the cgroup part)"];
+  signals [label="block SIGTERM/SIGINT before any other thread,\nstart the signal thread"];
+  remote  [label="every target's control port answers\n/v1/info and /v1/context?\n(skipped with --no-target-control)"];
+  e3b     [label="exit 3\n(refused)", shape=octagon, fillcolor="#fdecea", color="#b23b3b"];
+  e3      [label="exit 3\n(refused)", shape=octagon, fillcolor="#fdecea", color="#b23b3b"];
+  setup   [label="bind own loopback listener\nread own node context"];
+  more    [label="more cycles\nplanned?", shape=diamond, fillcolor="#fff8e1", color="#b08900"];
+  sig     [label="shutdown\nrequested?", shape=diamond, fillcolor="#fff8e1", color="#b08900"];
+  before  [label="before-snapshot\n(own cgroup, listener drops, netstat,\nNIC path; every target's /v1/snapshot)"];
+  cycle   [label="measuring thread runs the cycle\n(paced slots, round-robin, loopback)"];
+  after   [label="after-snapshot"];
+  valid   [label="decide validity, log one line per target,\nWARN outliers and invalid cycle"];
+  write   [label="read contexts after the run\nwrite result file atomically\n(<output>.tmp-<run_id> → rename)"];
+  exit    [label="exit code?", shape=diamond, fillcolor="#fff8e1", color="#b08900"];
+  e0      [label="0: every cycle valid", shape=box, fillcolor="#dfe9d8", color="#2e7d32"];
+  e4      [label="4: at least one\ncycle invalid", shape=box, fillcolor="#fff8e1", color="#b08900"];
+  e143    [label="143 / 130: SIGTERM / SIGINT\nfile status `interrupted`", shape=box, fillcolor="#fff8e1", color="#b08900"];
+
+  start -> config;
+  config -> e2 [label="invalid"];
+  config -> checks [label="ok"];
+  checks -> e3 [label="no"];
+  checks -> signals [label="yes"];
+  signals -> remote;
+  remote -> e3b [label="no"];
+  remote -> setup [label="yes"];
+  setup -> more;
+  more -> sig [label="yes"];
+  sig -> before [label="no"];
+  before -> cycle -> after -> valid -> more;
+  sig -> write [label="yes"];
+  more -> write [label="no"];
+  write -> exit;
+  exit -> e0; exit -> e4; exit -> e143;
+}

@@ -1,0 +1,27 @@
+// Threads of `run` and `listen` and what may touch the timed section.
+digraph threads {
+  graph [rankdir=TB, fontname="Helvetica", fontsize=11, nodesep=0.4, ranksep=0.45, pad=0.3, compound=true,
+         label="Threads (signals never reach the measuring thread)", labelloc=t];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, fillcolor="#eef3fb", color="#4a6fa5"];
+  edge  [fontname="Helvetica", fontsize=9, color="#555555"];
+
+  subgraph cluster_run {
+    label="run"; style="rounded,dashed"; color="#888888"; fontsize=10;
+    rmain [label="main\nsnapshots, control-port client,\nvalidity, result file"];
+    rmeas [label="measure\nall async signals blocked,\ntimer slack 1 ns,\nnever logs inside a cycle", fillcolor="#e3f2e1", color="#2e7d32"];
+    racc  [label="accept\nown loopback listener"];
+    rsig  [label="signals\nsigwait(SIGTERM, SIGINT)"];
+    rsig -> rmain [label="shutdown flag", style=dashed];
+    rsig -> rmeas [label="checked\nbetween slots", style=dashed];
+    rmain -> rmeas [label="job / result\nper cycle"];
+  }
+  subgraph cluster_listen {
+    label="listen"; style="rounded,dashed"; color="#888888"; fontsize=10;
+    lmain [label="main\nwaits for the shutdown flag"];
+    lacc  [label="accept\npoll 1 s, accept until EAGAIN,\nhold last 64"];
+    lctl  [label="control\ntokio current_thread + hyper"];
+    lsig  [label="signals\nsigwait(SIGTERM, SIGINT)"];
+    lsig -> lmain [label="shutdown flag", style=dashed];
+    lctl -> lacc [label="reads counters\n(atomics)", style=dotted];
+  }
+}

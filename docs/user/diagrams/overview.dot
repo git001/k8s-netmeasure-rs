@@ -1,0 +1,29 @@
+// Who talks to whom: one measuring `run` and one target `listen`.
+digraph overview {
+  graph [rankdir=LR, fontname="Helvetica", fontsize=11, nodesep=0.5, ranksep=0.9, pad=0.3,
+         label="k8s-netmeasure: measuring side and target side", labelloc=t];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, fillcolor="#eef3fb", color="#4a6fa5"];
+  edge  [fontname="Helvetica", fontsize=9, color="#555555"];
+
+  subgraph cluster_source {
+    label="source node: pod running `run`"; style="rounded,dashed"; color="#888888"; fontsize=10;
+    run      [label="run\n(main thread:\nsnapshots, validity,\nresult file)"];
+    measure  [label="measuring thread\n(paced connects,\nno logging, no signals)"];
+    lo       [label="own loopback listener\n127.0.0.1:<ephemeral>\n(local control)", fillcolor="#f4f4f4"];
+    file     [label="result.json", shape=note, fillcolor="#fff8e1", color="#b08900"];
+    run -> measure [label="one job\nper cycle"];
+    measure -> lo  [label="every n-th slot\n(--loopback-every)"];
+    run -> file    [label="atomic write\nat the end"];
+  }
+
+  subgraph cluster_target {
+    label="target node: pod running `listen`"; style="rounded,dashed"; color="#888888"; fontsize=10;
+    mport    [label="measured port :17700\naccept, hold 64,\nnever read or write"];
+    cport    [label="control port :17701\nHTTP/1.1 + JSON\n/startup /live /ready\n/v1/info /v1/context /v1/snapshot"];
+  }
+
+  measure -> mport [label="TCP connect\n(the measured\nquantity)", color="#2e7d32", fontcolor="#2e7d32", penwidth=1.6];
+  run -> cport     [label="GET /v1/*\nbefore and after\nevery cycle", style=dashed];
+  kubelet [label="kubelet probes", shape=ellipse, fillcolor="#f4f4f4"];
+  kubelet -> cport [style=dotted];
+}

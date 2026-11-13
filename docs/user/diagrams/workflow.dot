@@ -1,0 +1,19 @@
+// The recommended order of steps for a test series.
+digraph workflow {
+  graph [rankdir=TB, fontname="Helvetica", fontsize=11, nodesep=0.4, ranksep=0.35, pad=0.3,
+         label="Typical test series", labelloc=t];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, fillcolor="#eef3fb", color="#4a6fa5", width=3.4];
+  edge  [fontname="Helvetica", fontsize=9, color="#555555"];
+
+  selftest [label="1. selftest on one node of every node type\n(overlay pod and hostNetwork pod)"];
+  findings [label="read the findings: which fields will be\n`unknown`, anomaly rate, pacing", shape=note, fillcolor="#fff8e1", color="#b08900", width=2.8];
+  listen   [label="2. start `listen` on the target nodes"];
+  probe    [label="3. probe each target once\n(cross-check: reachable, ok, no anomaly)"];
+  run      [label="4. run: baseline (e.g. --label phase=baseline)"];
+  change   [label="5. apply the change under test\n(kernel, driver, node pool, …)", fillcolor="#fdecea", color="#b23b3b"];
+  run2     [label="6. run again with the same parameters\n(--label phase=after)"];
+  report   [label="7. report: compare the result files\n(milestone 5, follows)", style="rounded,dashed,filled", fillcolor="#f4f4f4"];
+
+  selftest -> findings [style=dashed, arrowhead=none];
+  selftest -> listen -> probe -> run -> change -> run2 -> report;
+}
