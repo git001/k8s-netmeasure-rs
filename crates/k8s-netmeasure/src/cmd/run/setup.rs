@@ -105,8 +105,8 @@ pub fn config(
     args: &RunArgs,
     setup: &Setup,
     listener: &str,
-    path: String,
-    path_source: String,
+    (path, path_source): (String, String),
+    control: Option<String>,
 ) -> Config {
     Config {
         samples: args.samples,
@@ -128,5 +128,7 @@ pub fn config(
         .into(),
         no_cgroup_check: args.no_cgroup_check,
         target_control_port: (!args.no_target_control).then_some(args.target_control_port),
+        shutdown_deadline_ns: as_nanos_u64(args.shutdown_deadline),
+        control,
     }
 }

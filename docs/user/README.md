@@ -7,8 +7,7 @@ families, kernels or drivers. The design and its reasoning are in
 
 **State:** this guide describes what is built today. `selftest`, `probe`, `listen` and
 `run` are usable, including `--node-context-from` (NIC context for overlay pods).
-Still missing: the shutdown deadline, example manifests, and `report` (comparison of
-result files).
+Still missing: example manifests and `report` (comparison of result files).
 Those parts are marked *follows*.
 
 > [!WARNING]

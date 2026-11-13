@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `run --shutdown-deadline` (default 10s, design §8): after the first SIGTERM/SIGINT
+  no new cycle starts; the running cycle is finished if its remaining slots fit into
+  the deadline, else it ends at once as `interrupted`. Recorded as
+  `config.shutdown_deadline_ns`.
+- `run --control-port` / `--control-bind` (off by default): the same probes and `/v1/*`
+  as `listen`, with the `run_id` as `listener_instance` and liveness bounds for the
+  measuring and main threads; recorded as `config.control`. A set port that cannot
+  be bound is exit 3.
 - `--node-context-from <ip:port>` for `run`, `listen` and `selftest` (node listener,
   design §5): the NIC path of an underlay `listen` on the same node, proven by equal
   `boot_id`, stands in for the pod's own (`observed_via_node_listener`). Refused

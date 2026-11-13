@@ -96,6 +96,10 @@ pub struct Config {
     pub no_cgroup_check: bool,
     /// `--target-control-port`; `None` with `--no-target-control`.
     pub target_control_port: Option<u16>,
+    /// `--shutdown-deadline` (§8).
+    pub shutdown_deadline_ns: u64,
+    /// The own control port (`--control-port`), `None` if off.
+    pub control: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -45,6 +45,12 @@ second. The README describes how to size `--backlog` and `--load-rate` together.
   thread starts, so every thread inherits the mask; one `signals` thread takes them
   with `sigwait` (`nix` `SigSet::wait`, no `unsafe`, no extra crate) and sets a flag
   every thread reads.
+- **Implemented in milestone 3e:** the measuring thread checks the flag between
+  slots; at the first slot after the signal it decides once whether the remaining
+  slots × interval fit into what is left of the deadline (measured from the signal).
+  A finished cycle stays valid; the file status is still `interrupted`, because the
+  run as a whole ended early, and no further cycle starts. `--shutdown-deadline`
+  accepts 1 ms – 300 s and is recorded as `config.shutdown_deadline_ns`.
 - A second signal exits immediately (the `signals` thread calls `exit(128 + signal)`). Because of
   the atomic write there is then either no new file or a complete one.
 - `listen`: `/ready` switches to `503` at once; stop accepting, close the measured

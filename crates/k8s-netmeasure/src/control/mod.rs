@@ -5,6 +5,7 @@
 //! before the thread starts (exit 3).
 
 pub mod client;
+pub mod endpoints;
 mod routes;
 pub mod state;
 

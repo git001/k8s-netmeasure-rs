@@ -81,7 +81,7 @@ impl fmt::Display for ControlBind {
     }
 }
 
-fn control_bind(text: &str) -> Result<ControlBind, String> {
+pub fn control_bind(text: &str) -> Result<ControlBind, String> {
     if text == "auto" {
         return Ok(ControlBind::Auto);
     }

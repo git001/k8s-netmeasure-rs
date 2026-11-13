@@ -1,5 +1,4 @@
-//! `run` arguments (design §3.4, §3.5, §3.7, §5, §7, §9). `--node-context-from` and
-//! the shutdown deadline follow in milestones 3d2 and 3e;
+//! `run` arguments (design §3.4, §3.5, §3.7, §5, §7, §8, §9);
 //! background load in milestone 6.
 
 use std::net::SocketAddrV4;
@@ -93,6 +92,24 @@ pub struct RunArgs {
     #[arg(long, env = "K8S_NETMEASURE_NO_CGROUP_CHECK", action = clap::ArgAction::SetTrue,
           value_parser = clap::builder::BoolValueParser::new())]
     pub no_cgroup_check: bool,
+
+    /// After the first SIGTERM/SIGINT: the running cycle is finished if it fits into
+    /// this time, else it ends at once as `interrupted` (1ms–300s). Keep
+    /// terminationGracePeriodSeconds ≥ this + --timeout + 10s.
+    #[arg(long, env = "K8S_NETMEASURE_SHUTDOWN_DEADLINE", default_value = "10s",
+          value_parser = |t: &str| bounded(t, "--shutdown-deadline", Duration::from_millis(1), Duration::from_secs(300)))]
+    pub shutdown_deadline: Duration,
+
+    /// Serve probes and /v1/* on this port (off by default, so a measurement never
+    /// fails because a port is taken; suggested 17702).
+    #[arg(long, env = "K8S_NETMEASURE_CONTROL_PORT", value_parser = clap::value_parser!(u16).range(1..))]
+    pub control_port: Option<u16>,
+
+    /// IPv4 address of the control port; `auto` = the address of the default-route
+    /// interface. Only used with --control-port.
+    #[arg(long, env = "K8S_NETMEASURE_CONTROL_BIND", default_value_t = crate::ControlBind::Auto,
+          value_parser = crate::listen::control_bind)]
+    pub control_bind: crate::ControlBind,
 
     /// Result file (JSON, written atomically at the end).
     #[arg(long, env = "K8S_NETMEASURE_OUTPUT")]

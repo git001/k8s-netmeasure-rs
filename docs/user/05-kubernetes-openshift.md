@@ -56,6 +56,20 @@ pod. The overlay `listen` and the overlay `run` take
 Pass the node IP via the Downward API (`status.hostIP`). Two `listen` with
 `hostNetwork` on one node would collide on the ports; one per node is enough.
 
+## Shutdown and probes for a `run` Job
+
+Kubernetes sends SIGTERM and kills the pod after `terminationGracePeriodSeconds`
+(default 30 s). `run` needs up to `--shutdown-deadline` + `--timeout` + the time to
+write the file, so set
+
+```
+terminationGracePeriodSeconds ≥ shutdown-deadline + timeout + 10 s   (defaults: 25 s)
+```
+
+A long `run` Job that should have startup and liveness probes sets
+`--control-port 17702`; `/live` turns 503 only if the measuring or the main thread
+stalls, never because of the network.
+
 ## Node name and context
 
 Pass the node name through the Downward API so result files name nodes, not IPs:

@@ -6,7 +6,7 @@ mod common;
 use std::time::{Duration, Instant};
 
 use netmeasure_core::measure::record::flag;
-use netmeasure_core::schema::result::RunStatus;
+use netmeasure_core::schema::result::{ResultFile, RunStatus};
 use nix::sys::signal::Signal;
 
 use common::listen::{start, stop_with};
@@ -94,10 +94,11 @@ fn complete_run_counts_samples_per_target() {
     stop_with(l.child, Signal::SIGTERM);
 }
 
-#[test]
-fn sigterm_writes_an_interrupted_file_and_exits_143() {
+/// `run` against a fresh `listen`, stopped by SIGTERM after 800 ms; returns the exit
+/// code, the log, the time from signal to exit and the result file.
+fn stopped_run(name: &str, deadline: &str) -> (i32, String, Duration, ResultFile) {
     let l = start();
-    let out = out_path("interrupted");
+    let out = out_path(name);
     let child = spawn(&[
         "run",
         "--target",
@@ -111,14 +112,24 @@ fn sigterm_writes_an_interrupted_file_and_exits_143() {
         "--no-cgroup-check",
         "--target-control-port",
         common::listen::port(&l.control),
+        "--shutdown-deadline",
+        deadline,
     ]);
     std::thread::sleep(Duration::from_millis(800));
     let started = Instant::now();
     let (code, log) = stop_with(child, Signal::SIGTERM);
+    let took = started.elapsed();
+    stop_with(l.child, Signal::SIGTERM);
+    (code, log, took, read(&out))
+}
+
+#[test]
+fn sigterm_past_the_deadline_interrupts_the_cycle() {
+    let (code, log, took, r) = stopped_run("interrupted", "1ms");
     assert_eq!(code, 143, "{log}");
-    assert!(started.elapsed() < Duration::from_secs(5));
-    let r = read(&out);
+    assert!(took < Duration::from_secs(5));
     assert_eq!(r.run.status, RunStatus::Interrupted);
+    assert_eq!(r.run.config.shutdown_deadline_ns, 1_000_000);
     let last = r.measurement.cycles.last().expect("at least one cycle");
     assert!(
         last.validity.reasons.contains(&"interrupted".to_owned()),
@@ -126,5 +137,28 @@ fn sigterm_writes_an_interrupted_file_and_exits_143() {
         last.validity
     );
     assert_eq!(r.measurement.samples.count, last.end_sample);
-    stop_with(l.child, Signal::SIGTERM);
+}
+
+#[test]
+fn sigterm_within_the_deadline_finishes_the_cycle() {
+    let (code, log, _, r) = stopped_run("finished", "10s");
+    assert_eq!(code, 143, "{log}");
+    assert_eq!(
+        r.run.status,
+        RunStatus::Interrupted,
+        "the run as a whole ended early"
+    );
+    let cycles = &r.measurement.cycles;
+    assert!(
+        cycles.len() < r.run.config.cycle_slots.len(),
+        "no new cycle after the signal"
+    );
+    let last = cycles.last().unwrap();
+    assert!(last.validity.valid, "{:?}", last.validity);
+    let planned = r.run.config.cycle_slots[cycles.len() - 1];
+    assert_eq!(
+        last.end_sample - last.first_sample,
+        planned,
+        "the cycle was measured in full"
+    );
 }

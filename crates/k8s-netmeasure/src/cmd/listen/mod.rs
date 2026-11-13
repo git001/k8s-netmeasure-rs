@@ -11,14 +11,14 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-mod endpoints;
 mod node;
+mod watch;
 
 use netmeasure_cli::{ControlBind, ListenArgs};
 
-use crate::control::Server;
 use crate::control::state::State;
-use crate::diag::net;
+use crate::control::{Server, endpoints};
+use crate::diag::{context, net};
 use crate::exit;
 use crate::listener::Listener;
 use crate::shutdown::{self, Shutdown};
@@ -63,10 +63,16 @@ pub fn run(args: &ListenArgs) -> ExitCode {
         }
     };
     let main_beat = Arc::new(AtomicU64::new(time::monotonic_ns()));
-    let context = endpoints::initial_context(args);
+    let context = context::read_context(&context::Declared::from_args(&args.context));
     let state = Arc::new(State::new(
-        endpoints::endpoints(args, &listener, node.as_ref().map(node::Node::cache)),
-        endpoints::heartbeats(&listener, &main_beat),
+        endpoints::endpoints(
+            args.backlog,
+            &args.context,
+            &listener,
+            node.as_ref().map(node::Node::cache),
+            ulid::Ulid::generate().to_string(),
+        ),
+        watch::heartbeats(&listener, &main_beat),
     ));
     let control_addr = SocketAddrV4::new(control_ip, args.control_port);
     let server = match Server::start(control_addr, Arc::clone(&state)) {

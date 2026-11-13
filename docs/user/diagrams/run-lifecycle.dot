@@ -13,11 +13,11 @@ digraph run_lifecycle {
   remote  [label="every target's control port answers\n/v1/info and /v1/context?\n(skipped with --no-target-control)"];
   e3b     [label="exit 3\n(refused)", shape=octagon, fillcolor="#fdecea", color="#b23b3b"];
   e3      [label="exit 3\n(refused)", shape=octagon, fillcolor="#fdecea", color="#b23b3b"];
-  setup   [label="bind own loopback listener\nread own node context"];
+  setup   [label="bind own loopback listener\nread own node context\nbind --control-port if set (else exit 3)"];
   more    [label="more cycles\nplanned?", shape=diamond, fillcolor="#fff8e1", color="#b08900"];
   sig     [label="shutdown\nrequested?", shape=diamond, fillcolor="#fff8e1", color="#b08900"];
   before  [label="before-snapshot\n(own cgroup, listener drops, netstat,\nNIC path; every target's /v1/snapshot)"];
-  cycle   [label="measuring thread runs the cycle\n(paced slots, round-robin, loopback)"];
+  cycle   [label="measuring thread runs the cycle\n(paced slots, round-robin, loopback)\non a signal: finish if the rest fits into\n--shutdown-deadline, else end now (interrupted)"];
   after   [label="after-snapshot"];
   valid   [label="decide validity, log one line per target,\nWARN outliers and invalid cycle"];
   write   [label="read contexts after the run\nwrite result file atomically\n(<output>.tmp-<run_id> → rename)"];

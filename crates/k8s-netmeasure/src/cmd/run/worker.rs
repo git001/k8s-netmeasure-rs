@@ -1,10 +1,14 @@
 //! The measuring-thread side of `run` (design §3.4, §3.5): one cycle per job, paced
 //! with absolute deadlines, round-robin over the targets with every n-th slot on the
 //! loopback control. Nothing here logs or allocates per sample beyond the
-//! preallocated vectors; the shutdown flag is checked between slots.
+//! preallocated vectors. The shutdown flag is checked between slots: after the first
+//! signal the cycle is finished if it fits into the shutdown deadline (§8).
 
 use std::net::SocketAddrV4;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
+use netmeasure_core::measure::cycles::finish_after_signal;
 use netmeasure_core::measure::outcome::peer_closed;
 use netmeasure_core::measure::pacing::{Next, Pacer};
 use netmeasure_core::measure::plan::{SlotPlan, SlotTarget};
@@ -39,6 +43,10 @@ pub struct Worker {
     /// Samples taken so far per target index, for the warm-up flag.
     pub seen: Vec<u64>,
     pub shutdown: Shutdown,
+    /// `--shutdown-deadline` in ns (§8).
+    pub shutdown_deadline_ns: u64,
+    /// Monotonic ns of the last slot or job (liveness, §7).
+    pub heartbeat: Arc<AtomicU64>,
 }
 
 impl Worker {
@@ -51,10 +59,23 @@ impl Worker {
             overruns: 0,
             interrupted: false,
         };
+        self.heartbeat.store(origin_ns, Ordering::Relaxed);
+        let mut finishing = false;
         for k in 0..job.slots {
-            if self.shutdown.requested().is_some() {
-                out.interrupted = true;
-                break;
+            if !finishing && let Some(at) = self.shutdown.requested_at_ns() {
+                let now = time::monotonic_ns();
+                if finish_after_signal(
+                    job.slots - k,
+                    self.interval_ns,
+                    at,
+                    self.shutdown_deadline_ns,
+                    now,
+                ) {
+                    finishing = true;
+                } else {
+                    out.interrupted = true;
+                    break;
+                }
             }
             if let Next::At(deadline) = pacer.next() {
                 time::sleep_until(deadline);
@@ -65,7 +86,9 @@ impl Worker {
                 SlotTarget::Real(i) => i as usize + 1,
             };
             let a = connect::attempt(self.addrs[index], self.timeout_ns);
-            let overran = pacer.end(time::monotonic_ns());
+            let end = time::monotonic_ns();
+            let overran = pacer.end(end);
+            self.heartbeat.store(end, Ordering::Relaxed);
             out.overruns += u64::from(overran);
             let warm = self.seen[index] < self.warmup;
             self.seen[index] += 1;

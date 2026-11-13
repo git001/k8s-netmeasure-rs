@@ -2,6 +2,7 @@
 //! the cycle → after-snapshot → validity. The measuring thread lives for the whole run
 //! and gets one job per cycle.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc;
 
 use netmeasure_core::measure::record::Sample;
@@ -30,6 +31,8 @@ pub struct Session<'a> {
     pub targets_unchecked: bool,
     pub shutdown: &'a Shutdown,
     pub origin_ns: u64,
+    /// The main thread's liveness heartbeat (§7).
+    pub main_beat: &'a AtomicU64,
     /// Monotonic ns → RFC 3339.
     pub wall: &'a dyn Fn(u64) -> String,
 }
@@ -61,6 +64,7 @@ pub fn measure(
     let (mut first_slot, mut nic_first) = (0, None);
     let mut remote_nic_first = vec![None; s.remotes.len()];
     for (index, &slots) in s.setup.cycle_slots.iter().enumerate() {
+        s.main_beat.store(time::monotonic_ns(), Ordering::Relaxed);
         if s.shutdown.requested().is_some() {
             break;
         }

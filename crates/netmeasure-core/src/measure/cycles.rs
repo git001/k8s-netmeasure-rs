@@ -1,6 +1,7 @@
 //! Number of cycles per run (design §3.5): `--cycles` (default 10) or `--cycle
 //! <duration>`, then clamped so that one cycle lasts between 2 s and 60 s at the
-//! planned pace. The effective count is recorded in the result file.
+//! planned pace. The effective count is recorded in the result file. Also: whether
+//! the running cycle is finished after a shutdown signal (§8).
 
 pub const MIN_CYCLE_NS: u64 = 2_000_000_000;
 pub const MAX_CYCLE_NS: u64 = 60_000_000_000;
@@ -25,6 +26,20 @@ pub fn effective(request: Request, run_ns: u64, samples: u64) -> u64 {
     wanted
         .clamp(fewest, most.max(fewest))
         .clamp(1, samples.max(1))
+}
+
+/// After the first shutdown signal (design §8): the running cycle is finished if its
+/// remaining slots fit into what is left of the shutdown deadline, else it ends at
+/// once and is `interrupted`.
+pub fn finish_after_signal(
+    remaining_slots: u64,
+    interval_ns: u64,
+    signal_ns: u64,
+    deadline_ns: u64,
+    now_ns: u64,
+) -> bool {
+    let left = signal_ns.saturating_add(deadline_ns).saturating_sub(now_ns);
+    remaining_slots.saturating_mul(interval_ns) <= left
 }
 
 #[cfg(test)]
@@ -53,6 +68,23 @@ mod tests {
             "≤ 60 s"
         );
         assert_eq!(effective(Request::Count(50), 60 * S, 20), 20, "≤ samples");
+    }
+
+    #[test]
+    fn finishing_needs_the_remaining_slots_to_fit() {
+        let ms = 1_000_000;
+        assert!(
+            finish_after_signal(100, 10 * ms, 0, 10 * S, 0),
+            "1 s of 10 s"
+        );
+        assert!(
+            !finish_after_signal(100, 10 * ms, 0, 10 * S, 9_500 * ms),
+            "0.5 s left"
+        );
+        assert!(
+            finish_after_signal(0, 10 * ms, 0, ms, 5 * S),
+            "nothing left to do"
+        );
     }
 
     #[test]

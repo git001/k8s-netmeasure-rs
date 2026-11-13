@@ -109,6 +109,13 @@ port, one protocol**. That matches the prompt's "`/ready` next to `/metrics`".
   failures" rule applied to HTTP.
 - All three Kubernetes probes are `httpGet` on the control port. Probes never touch
   the measured port. Manual check: `curl http://<host>:17701/v1/context`.
+- **`run --control-port`** (implemented in milestone 3e) serves the same endpoints as
+  `listen`; `/v1/info` carries the `run_id` as `listener_instance`, and the
+  measured listener in `/v1/snapshot` is the loopback control. Watched threads:
+  measuring (`2 × timeout + interval + 30 s`, since it waits during the snapshots
+  between cycles) and main (longest cycle + 30 s). `/ready` turns 503 when the
+  measurement ends or the first signal arrives. `--control-bind` defaults to `auto`
+  as for `listen`; the address is recorded as `config.control`.
 - **The control server always runs in `listen`** (and in `serve` in Phase 3). In `run`
   it runs only with `--control-port`; a long `run` Job that wants startup and liveness
   probes sets it. `run`'s own measured listener is loopback-only (§4.1), so `run` is

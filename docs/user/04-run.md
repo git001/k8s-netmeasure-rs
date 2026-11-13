@@ -8,6 +8,7 @@ k8s-netmeasure run --target 10.0.0.5:17700 [--target 10.0.0.6:17700 ...] --outpu
     [--cycles 10 | --cycle 20s] [--timeout 5s] [--outlier-threshold 20ms] \
     [--path overlay|underlay] [--label k=v ...] [--backlog 4096] \
     [--target-control-port 17701 | --no-target-control] [--no-cgroup-check] \
+    [--shutdown-deadline 10s] [--control-port 17702 [--control-bind auto]] \
     [--node-name N] [--zone Z] [--instance-type T] [--node-context-from <node-ip>:17701]
 ```
 
@@ -31,6 +32,8 @@ k8s-netmeasure run --target 10.0.0.5:17700 [--target 10.0.0.6:17700 ...] --outpu
 | `--no-target-control` | off | measure plain TCP listeners without a control port (target-side checks off) |
 | `--no-cgroup-check` | off | measure even if the cgroup is unreadable (throttling not checked) |
 | `--node-context-from` | none | node listener for the own NIC path (overlay pods); see [Concepts](01-concepts.md#paths-overlay-and-underlay) |
+| `--shutdown-deadline` | 10s | after SIGTERM/SIGINT the running cycle is finished if it fits into this time, else it ends at once |
+| `--control-port`, `--control-bind` | off, `auto` | probes and `/v1/*` for a long `run` Job, same endpoints as `listen`; a set port that cannot be bound is exit 3 |
 | `--output` | required | result file; its directory must exist |
 
 Duration at the defaults with one target: `(5000 + 50) × 10 ms × 10/9` ≈ 56 s. With
@@ -46,7 +49,8 @@ Duration at the defaults with one target: `(5000 + 50) × 10 ms × 10/9` ≈ 56 
 - a target's control port does not answer (unless `--no-target-control`);
 - the node listener (`--node-context-from`) does not answer, is on another node, or
   sees no NIC;
-- its own loopback listener cannot be bound.
+- its own loopback listener cannot be bound;
+- `--control-port` is set and cannot be bound.
 
 ## The result file
 
@@ -87,7 +91,7 @@ end. The measuring thread never logs during a cycle.
 |---|---|---|
 | 0 | every cycle valid | `complete` |
 | 4 | at least one cycle invalid | `complete` |
-| 143 / 130 | SIGTERM / SIGINT; the current cycle ends early | `interrupted` |
+| 143 / 130 | SIGTERM / SIGINT: no new cycle starts; the running one is finished if it fits into `--shutdown-deadline`, else it ends at once and is invalid (`interrupted`) | `interrupted` |
 | 2 | usage or configuration error | none |
 | 3 | refused to start (see start checks) | none |
 | 1 | internal error | none if it could not be written |

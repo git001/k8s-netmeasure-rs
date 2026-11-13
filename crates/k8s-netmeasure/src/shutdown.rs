@@ -5,13 +5,15 @@
 
 use std::io;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::{AtomicI32, AtomicU64, Ordering};
 
-use crate::sys::signals;
+use crate::sys::{signals, time};
 
 #[derive(Clone)]
 pub struct Shutdown {
     signal: Arc<AtomicI32>,
+    /// Monotonic ns of the first signal; 0 before.
+    at_ns: Arc<AtomicU64>,
 }
 
 impl Shutdown {
@@ -22,7 +24,8 @@ impl Shutdown {
         let set = signals::termination();
         signals::block(&set).map_err(io::Error::from_raw_os_error)?;
         let signal = Arc::new(AtomicI32::new(0));
-        let seen = Arc::clone(&signal);
+        let at_ns = Arc::new(AtomicU64::new(0));
+        let (seen, at) = (Arc::clone(&signal), Arc::clone(&at_ns));
         std::thread::Builder::new()
             .name("signals".into())
             .spawn(move || {
@@ -32,6 +35,9 @@ impl Shutdown {
                         return;
                     };
                     let sig = sig as i32;
+                    let now = time::monotonic_ns();
+                    // Time first: whoever sees the signal also sees its time.
+                    let _ = at.compare_exchange(0, now, Ordering::SeqCst, Ordering::SeqCst);
                     if seen
                         .compare_exchange(0, sig, Ordering::SeqCst, Ordering::SeqCst)
                         .is_ok()
@@ -43,7 +49,13 @@ impl Shutdown {
                     }
                 }
             })?;
-        Ok(Shutdown { signal })
+        Ok(Shutdown { signal, at_ns })
+    }
+
+    /// Monotonic ns of the first signal, if any.
+    pub fn requested_at_ns(&self) -> Option<u64> {
+        self.requested()?;
+        Some(self.at_ns.load(Ordering::SeqCst))
     }
 
     /// The first signal received, if any.

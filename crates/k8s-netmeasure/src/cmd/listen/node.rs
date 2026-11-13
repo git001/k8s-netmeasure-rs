@@ -12,9 +12,6 @@ use crate::control::client::Client;
 use crate::diag::context;
 use crate::diag::node_listener::NodeListener;
 
-/// The NIC path to report; `None` without `--node-context-from` (observe directly).
-pub type NicCache = Option<Arc<Mutex<Sourced<NicPath>>>>;
-
 pub struct Node {
     client: Client,
     listener: NodeListener,
@@ -46,13 +43,5 @@ impl Node {
         if let Ok(mut c) = self.cache.lock() {
             *c = nic;
         }
-    }
-}
-
-/// The NIC path to report now.
-pub fn nic(cache: &NicCache) -> Sourced<NicPath> {
-    match cache {
-        Some(c) => c.lock().map_or_else(|_| Sourced::unknown(), |g| g.clone()),
-        None => context::nic_path(),
     }
 }
