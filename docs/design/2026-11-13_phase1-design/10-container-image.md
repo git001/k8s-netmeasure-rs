@@ -1,0 +1,72 @@
+# Phase 1 design — 10 Container image
+
+Part of the [Phase 1 design](README.md) · covers §13 · previous: [Tests and quality gates](09-tests-and-ci.md) · next: [Implementation plan and prerequisites](11-implementation-plan.md)
+
+---
+
+## 13. Container image
+
+The tool runs as a container in Kubernetes/OpenShift, so the image is a **Phase 1
+deliverable**, not Phase 2. Phase 2 adds only the chart around it.
+
+`Containerfile`, multi-stage:
+
+1. **Builder:** `registry.access.redhat.com/ubi10/ubi`, with `gcc` (for
+   `libmimalloc-sys`; why mimalloc at all, and why it does not touch the measurement:
+   §2), `rustup` installed with checksum verification, the toolchain
+   pinned by `rust-toolchain.toml`. It runs `cargo build --release --locked`. Building
+   in the image guarantees the glibc baseline of §1 (2.39).
+2. **Runtime:** `registry.access.redhat.com/ubi10/ubi-minimal`, both base images pinned
+   by digest:
+   - The binary sits at `/usr/local/bin/k8s-netmeasure`, the license files in
+     `/licenses/`.
+   - `USER 1001` (numeric, non-root). The image works under any arbitrary UID:
+     nothing is written except to the `--output` directory, which is a mounted volume.
+     That makes `readOnlyRootFilesystem: true` possible.
+   - `ENTRYPOINT ["/usr/local/bin/k8s-netmeasure"]`, `CMD ["--help"]`.
+   - OCI labels (`org.opencontainers.image.{source,revision,version,licenses}`) carry
+     the same `build_info` values the binary reports.
+   - No `EXPOSE`-based probing assumptions; ports come from flags.
+   - The image still contains `bash` and `microdnf` (part of ubi-minimal), which helps
+     with `oc exec` debugging. The binary does not need either.
+   - **No full libcurl** (revised in review round 1). An earlier version of this design
+     swapped `libcurl-minimal` for the full `libcurl` so that `curl -v telnet://…`
+     would work. That pulls in libraries for LDAP, SSH, SMB and more, which the tool
+     never uses; in environments where image scan findings are a deployment gate that
+     is a bad trade. The manual cross-check is instead:
+     - `k8s-netmeasure probe --target <ip>:<port>` (§3.9): same connect path as `run`,
+       with timing, outcome and SYN retransmissions;
+     - without timing, plain bash: `exec 3<>/dev/tcp/<ip>/<port> && exec 3<&-`.
+
+     The image keeps ubi-minimal's stock `curl` (HTTP only), which is enough for
+     `curl http://<pod-ip>:17701/v1/context`.
+
+**Registry: `ghcr.io/git001/k8s-netmeasure-rs`** (decided 2026-11-13).
+- **Pushing:** CI pushes with the workflow's `GITHUB_TOKEN` (`packages: write`); no
+  long-lived registry credentials.
+- **Pulling:** a newly created GHCR package is private by default. To pull without a
+  pull secret, the package visibility must be set to public once, matching the public
+  repository. Otherwise the namespace needs an image pull secret.
+- **Tags:** `<version>` and `sha-<git short sha>`, never only `latest`. Deployments
+  reference the image by digest.
+- **Provenance:** the image is signed and gets a build provenance attestation in CI
+  (GitHub `attest-build-provenance`), so a cluster can verify where it came from.
+- **Mirrored registries.** Many clusters may only pull from an internal registry, into
+  which images are mirrored first. Nothing may hard-code the GHCR reference:
+  - the README documents the mirror step (`skopeo copy --all` / `oc image mirror` by
+    digest, so the signature and attestation stay valid);
+  - every example manifest takes the image reference as a single parameter;
+  - the Phase 2 chart exposes `image.repository`, `image.tag` and `image.digest`.
+- x86_64 only for now.
+- The image is the distribution format (§1). The binary inside it comes from the
+  builder stage and is dynamically linked against UBI 10's glibc. The static musl
+  binary is only an emergency release artifact, never part of the image.
+
+Phase 1 ad hoc use with the image:
+
+- **Overlay:** a plain pod running the image, e.g.
+  `oc run netmeasure-a --image=<image> -- listen …`.
+- **Underlay:** a pod with `hostNetwork: true` under the `hostnetwork-v2` SCC. This is
+  not `oc debug node`, because that creates a privileged pod, which the prompt rules
+  out. A minimal example manifest goes into `deploy/examples/`; the real chart follows
+  in Phase 2.
