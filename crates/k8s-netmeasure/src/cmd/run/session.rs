@@ -13,6 +13,7 @@ use super::snapshot::{self, Snap};
 use super::worker::{CycleRun, Job, Worker};
 use super::{cycle, setup::Setup};
 use crate::control::client::Client;
+use crate::diag::node_listener::NodeListener;
 use crate::listener::Handle;
 use crate::measure::thread;
 use crate::shutdown::Shutdown;
@@ -40,7 +41,12 @@ pub struct Outcome {
     pub samples: Vec<Sample>,
 }
 
-pub fn measure(s: &Session<'_>, client: &mut Client, worker: Worker) -> Outcome {
+pub fn measure(
+    s: &Session<'_>,
+    client: &mut Client,
+    mut node: Option<&mut NodeListener>,
+    worker: Worker,
+) -> Outcome {
     let (job_tx, job_rx) = mpsc::channel::<Job>();
     let (done_tx, done_rx) = mpsc::channel::<CycleRun>();
     let mut worker = worker;
@@ -58,14 +64,14 @@ pub fn measure(s: &Session<'_>, client: &mut Client, worker: Worker) -> Outcome 
         if s.shutdown.requested().is_some() {
             break;
         }
-        let before = snapshot::take(&s.listener, client, s.remotes);
+        let before = snapshot::take(&s.listener, client, s.remotes, node.as_deref_mut());
         let started = time::monotonic_ns();
         if job_tx.send(Job { first_slot, slots }).is_err() {
             break;
         }
         let Ok(run) = done_rx.recv() else { break };
         let ended = time::monotonic_ns();
-        let after = snapshot::take(&s.listener, client, s.remotes);
+        let after = snapshot::take(&s.listener, client, s.remotes, node.as_deref_mut());
         if index == 0 {
             nic_first = before.nic.value.clone();
             for (first, snap) in remote_nic_first.iter_mut().zip(&before.targets) {

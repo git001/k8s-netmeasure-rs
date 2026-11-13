@@ -3,8 +3,9 @@
 Reproducible TCP connect-latency measurement in Kubernetes and OpenShift.
 
 **Status: milestone 3 of the [Phase 1 implementation plan](docs/design/2026-11-13_phase1-design/11-implementation-plan.md)
-in progress:** `probe`, `selftest`, `listen` and `run` (`--node-context-from` and the
-shutdown deadline follow). `report` follows. The [user guide](docs/user/README.md) explains how to use the tool, with diagrams of
+in progress:** `probe`, `selftest`, `listen` and `run`, including
+`--node-context-from` (the shutdown deadline and example manifests follow). `report`
+follows. The [user guide](docs/user/README.md) explains how to use the tool, with diagrams of
 the flows. The design is in
 [docs/design/2026-11-13_phase1-design/](docs/design/2026-11-13_phase1-design/README.md).
 

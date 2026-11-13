@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 
 use netmeasure_core::diag::cgroup::{ancestor_throttling, floor_millicores};
-use netmeasure_core::measure::validity::SideCounters;
+use netmeasure_core::measure::validity::{NodeListener as NodeListenerState, SideCounters};
 use netmeasure_core::schema::control::Snapshot;
 use netmeasure_core::schema::nic::NicPath;
 use netmeasure_core::schema::result::CgroupCheck;
@@ -13,6 +13,7 @@ use netmeasure_core::schema::sourced::Sourced;
 
 use super::remote::{self, Remote};
 use crate::control::client::Client;
+use crate::diag::node_listener::NodeListener;
 use crate::diag::{cgroup, context, net};
 use crate::listener::Handle;
 
@@ -22,9 +23,16 @@ pub struct Snap {
     pub nic: Sourced<NicPath>,
     /// One per target with a control port; `None` where it did not answer.
     pub targets: Vec<Option<Snapshot>>,
+    pub node_listener: NodeListenerState,
 }
 
-pub fn take(listener: &Handle, client: &mut Client, remotes: &[Remote]) -> Snap {
+/// Own counters, the NIC path (directly or from the node listener) and every target.
+pub fn take(
+    listener: &Handle,
+    client: &mut Client,
+    remotes: &[Remote],
+    node: Option<&mut NodeListener>,
+) -> Snap {
     let cg = cgroup::read();
     let throttled = |l: &cgroup::Level| l.cpu_stat.map(|s| s.throttled_usec);
     let limited: Vec<u64> = cg
@@ -34,6 +42,10 @@ pub fn take(listener: &Handle, client: &mut Client, remotes: &[Remote]) -> Snap 
         .filter_map(throttled)
         .collect();
     let netstat = net::netstat();
+    let (nic, node_listener) = match node {
+        Some(n) => n.nic(client),
+        None => (context::nic_path(), NodeListenerState::NotUsed),
+    };
     Snap {
         counters: SideCounters {
             throttled_usec: cg.own.as_ref().and_then(throttled),
@@ -43,8 +55,9 @@ pub fn take(listener: &Handle, client: &mut Client, remotes: &[Remote]) -> Snap 
             netns_listen_overflows: netstat.get("TcpExt.ListenOverflows").copied(),
         },
         netstat,
-        nic: context::nic_path(),
+        nic,
         targets: remote::snapshots(client, remotes),
+        node_listener,
     }
 }
 

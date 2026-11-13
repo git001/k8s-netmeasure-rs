@@ -3,6 +3,7 @@
 //! cycle validity (§3.6).
 
 pub mod cycles;
+pub mod facts;
 pub mod outcome;
 pub mod pacing;
 pub mod plan;

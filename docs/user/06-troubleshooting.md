@@ -30,8 +30,8 @@ The reasons are in `measurement.cycles[].validity.reasons` and in the WARN log l
 | `interrupted` | the run was stopped | — |
 
 Annotations (`scheduling_jitter`, `pacing_overrun`, `netns_listen_drops`,
-`nic_path_unknown`, `cpu_throttle_unchecked`, `target_unchecked`) do not invalidate a
-cycle; they explain conditions that may matter when results are compared.
+`nic_path_unknown`, `node_context_unavailable`, `node_listener_mismatch`,
+`cpu_throttle_unchecked`, `target_unchecked`) do not invalidate a cycle; they explain conditions that may matter when results are compared.
 
 ## Common start errors
 
@@ -41,6 +41,8 @@ cycle; they explain conditions that may matter when results are compared.
 | `cgroup v2 cpu.max/cpu.stat unreadable` | cgroup v1 or an unusual sandbox | `--no-cgroup-check` (throttling then unchecked) |
 | `target control port check failed` | the target is not a `listen`, or its control port is filtered | open 17701, or `--no-target-control` |
 | `cannot write --output` | the directory does not exist | create it, or write to `/tmp` / a volume |
+| `node listener … is not on this node` | `--node-context-from` points to another node's listener | use the node IP of the pod's own node (`status.hostIP`) |
+| `node listener … sees no physical interface` | the node listener does not run with `hostNetwork` | start it with `hostNetwork` |
 | `--control-bind auto: no interface with an IPv4 default route` | unusual network setup | set `--control-bind` explicitly |
 | `Permission denied` on the report or result file | the working directory is not writable for the pod's UID | write to `/tmp` or a volume |
 | `GLIBC_2.xx not found` | the dynamic build on an older host | use the static (`musl`) build |

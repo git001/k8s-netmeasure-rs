@@ -7,6 +7,7 @@ use netmeasure_cli::ListenArgs;
 use netmeasure_core::diag::cgroup;
 use netmeasure_core::schema::control::{self, Info, ListenerCounters, NodeContext, Snapshot};
 
+use super::node::{self, NicCache};
 use crate::build_info::BUILD_INFO;
 use crate::control::state::{Endpoints, Heartbeat};
 use crate::diag::context::{self, Declared};
@@ -19,7 +20,7 @@ use crate::sys::time;
 const ACCEPT_BOUND_NS: u64 = 5_000_000_000;
 const MAIN_BOUND_NS: u64 = 5_000_000_000;
 
-pub fn endpoints(args: &ListenArgs, listener: &Listener) -> Endpoints {
+pub fn endpoints(args: &ListenArgs, listener: &Listener, nic: NicCache) -> Endpoints {
     let info = Info {
         schema: control::SCHEMA.into(),
         schema_version: control::SCHEMA_VERSION,
@@ -32,10 +33,15 @@ pub fn endpoints(args: &ListenArgs, listener: &Listener) -> Endpoints {
     let instance = info.listener_instance.clone();
     let declared = declared(args);
     let handle = listener.handle();
+    let nic_for_context = nic.clone();
     Endpoints {
         info: json(&info),
-        context: Box::new(move || json(&context::read_context(&declared))),
-        snapshot: Box::new(move || json(&snapshot(&handle, &instance))),
+        context: Box::new(move || {
+            let mut c = context::read_context(&declared);
+            c.nic = node::nic(&nic_for_context);
+            json(&c)
+        }),
+        snapshot: Box::new(move || json(&snapshot(&handle, &instance, &nic))),
     }
 }
 
@@ -61,7 +67,7 @@ pub fn heartbeats(listener: &Listener, main_beat: &Arc<AtomicU64>) -> Vec<Heartb
     ]
 }
 
-fn snapshot(handle: &Handle, instance: &str) -> Snapshot {
+fn snapshot(handle: &Handle, instance: &str, nic: &NicCache) -> Snapshot {
     let stats = handle.stats();
     let netstat = net::netstat();
     Snapshot {
@@ -77,7 +83,7 @@ fn snapshot(handle: &Handle, instance: &str) -> Snapshot {
         netns_listen_overflows: netstat.get("TcpExt.ListenOverflows").copied(),
         netns_listen_drops: netstat.get("TcpExt.ListenDrops").copied(),
         cpu_stat: crate::diag::cgroup::own_file("cpu.stat").map(|t| cgroup::parse_cpu_stat(&t)),
-        nic: context::nic_path(),
+        nic: node::nic(nic),
     }
 }
 

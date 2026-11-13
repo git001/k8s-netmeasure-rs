@@ -47,6 +47,14 @@ whether a slow sample was a lost packet or a slow path.
 Measuring both separates CNI effects from NIC effects. `run` records the path:
 declared with `--path`, otherwise detected (physical interfaces visible → underlay).
 
+A normal pod cannot see the node's NIC. For overlay measurements a **node listener**
+(a `listen` with `hostNetwork` on the same node) supplies it: `run` and `listen` take
+`--node-context-from <node-ip>:17701`, check that the node listener has the same
+`boot_id` (the same kernel, hence the same node) and then report its NIC path, marked
+`observed_via_node_listener`.
+
+![Node listener](diagrams/node-listener.svg)
+
 ## Pacing, round-robin and the loopback control
 
 ![Slot schedule](diagrams/slots.svg)

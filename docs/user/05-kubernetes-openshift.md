@@ -47,6 +47,15 @@ debug pod with `oc cp` lands in the pod, not on the host. The debug pod is
 privileged and runs as root: fine for `selftest` and `probe`, but its CPU and cgroup
 values are not those of a normal measuring pod.
 
+## Overlay with a node listener
+
+For overlay measurements run two `listen` on every node involved: one with
+`hostNetwork` (the node listener, port 17700/17701 on the node IP) and one in a normal
+pod. The overlay `listen` and the overlay `run` take
+`--node-context-from <node-ip>:17701`, so results carry the NIC path of the node.
+Pass the node IP via the Downward API (`status.hostIP`). Two `listen` with
+`hostNetwork` on one node would collide on the ports; one per node is enough.
+
 ## Node name and context
 
 Pass the node name through the Downward API so result files name nodes, not IPs:

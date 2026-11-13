@@ -8,7 +8,7 @@ k8s-netmeasure run --target 10.0.0.5:17700 [--target 10.0.0.6:17700 ...] --outpu
     [--cycles 10 | --cycle 20s] [--timeout 5s] [--outlier-threshold 20ms] \
     [--path overlay|underlay] [--label k=v ...] [--backlog 4096] \
     [--target-control-port 17701 | --no-target-control] [--no-cgroup-check] \
-    [--node-name N] [--zone Z] [--instance-type T]
+    [--node-name N] [--zone Z] [--instance-type T] [--node-context-from <node-ip>:17701]
 ```
 
 ![run lifecycle](diagrams/run-lifecycle.svg)
@@ -30,6 +30,7 @@ k8s-netmeasure run --target 10.0.0.5:17700 [--target 10.0.0.6:17700 ...] --outpu
 | `--target-control-port` | 17701 | where each target's control port is (same IP as the target) |
 | `--no-target-control` | off | measure plain TCP listeners without a control port (target-side checks off) |
 | `--no-cgroup-check` | off | measure even if the cgroup is unreadable (throttling not checked) |
+| `--node-context-from` | none | node listener for the own NIC path (overlay pods); see [Concepts](01-concepts.md#paths-overlay-and-underlay) |
 | `--output` | required | result file; its directory must exist |
 
 Duration at the defaults with one target: `(5000 + 50) × 10 ms × 10/9` ≈ 56 s. With
@@ -43,6 +44,8 @@ Duration at the defaults with one target: `(5000 + 50) × 10 ms × 10/9` ≈ 56 
 - the cgroup v2 CPU files are unreadable (unless `--no-cgroup-check`) or the CPU quota
   is below 500 millicores: a throttled measuring process measures itself;
 - a target's control port does not answer (unless `--no-target-control`);
+- the node listener (`--node-context-from`) does not answer, is on another node, or
+  sees no NIC;
 - its own loopback listener cannot be bound.
 
 ## The result file

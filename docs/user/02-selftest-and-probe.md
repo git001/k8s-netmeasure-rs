@@ -5,7 +5,7 @@
 ## `selftest`: is this kernel suitable?
 
 ```sh
-k8s-netmeasure selftest [--output selftest.json] [--log-level debug]
+k8s-netmeasure selftest [--output selftest.json] [--node-context-from <node-ip>:17701] [--log-level debug]
 ```
 
 Runs about 10 s, needs no privileges and touches only its own loopback listeners.
@@ -22,6 +22,7 @@ the measurement (overlay and/or `hostNetwork`), and keep the report with the res
 | `pacing` | how late the paced loop wakes up (p99 should be far below 1 ms) |
 | `signal-isolation` | a signal to the process never interrupts a measurement |
 | `cgroup-v2` | the CPU quota and throttling counters are readable |
+| `node-listener` | only with `--node-context-from`: the node listener is reachable, on this node (same boot id) and sees the NIC path |
 
 The output is a table on stdout, one JSON log line per check and, with `--output`, a
 JSON report including the node context (kernel, CPU, boot id, physical interfaces

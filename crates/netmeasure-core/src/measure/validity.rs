@@ -3,6 +3,7 @@
 //! NIC-path rules apply to the measuring side and to every target with a control
 //! port alike.
 
+pub use super::facts::{CycleFacts, NodeListener, SideCounters, TargetCycle};
 use crate::schema::nic::NicPath;
 use crate::schema::result::Validity;
 use crate::schema::sourced::Sourced;
@@ -12,57 +13,6 @@ use crate::stats::quantile::type1;
 pub const JITTER_P99_NS: u64 = 1_000_000;
 pub const JITTER_MAX_NS: u64 = 10_000_000;
 pub const OVERRUN_FRACTION: f64 = 0.05;
-
-/// Counters of the measuring side, read before and after a cycle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct SideCounters {
-    /// Own cgroup `cpu.stat` `throttled_usec`.
-    pub throttled_usec: Option<u64>,
-    /// Sum of `throttled_usec` over the visible ancestors with a quota (§3.7).
-    pub ancestors_throttled_usec: Option<u64>,
-    /// `SK_MEMINFO_DROPS` of the own loopback control listener.
-    pub sk_drops: Option<u32>,
-    pub netns_listen_drops: Option<u64>,
-    pub netns_listen_overflows: Option<u64>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CycleFacts {
-    pub planned_slots: u64,
-    pub recorded: u64,
-    /// `local_error` + `anomaly` samples.
-    pub invalid_samples: u64,
-    pub overruns: u64,
-    /// Wake-up lateness of every recorded slot, sorted.
-    pub lateness_sorted: Vec<u64>,
-    /// Shutdown ended the cycle early.
-    pub interrupted: bool,
-    pub before: SideCounters,
-    pub after: SideCounters,
-    /// `--no-cgroup-check` was given: throttling is not checked (§3.7).
-    pub cgroup_unchecked: bool,
-    pub nic_before: Sourced<NicPath>,
-    pub nic_after: Sourced<NicPath>,
-    /// The NIC path of the run's first cycle.
-    pub nic_first: Option<NicPath>,
-    /// Targets with a control port.
-    pub targets: Vec<TargetCycle>,
-    /// `--no-target-control`: the target side is not checked.
-    pub targets_unchecked: bool,
-}
-
-/// One target's control-port view of a cycle.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TargetCycle {
-    /// Counters before and after; `None` if the control port did not answer.
-    pub before: Option<SideCounters>,
-    pub after: Option<SideCounters>,
-    /// `listener_instance` and `boot_id` still those seen at the start of the run.
-    pub same_identity: bool,
-    pub nic_before: Sourced<NicPath>,
-    pub nic_after: Sourced<NicPath>,
-    pub nic_first: Option<NicPath>,
-}
 
 /// `after − before`; `None` if either is unknown or the counter went backwards.
 pub fn delta<T: Into<u64> + Copy>(before: Option<T>, after: Option<T>) -> Option<u64> {
@@ -100,6 +50,13 @@ pub fn evaluate(f: &CycleFacts) -> Validity {
     }
     if f.targets_unchecked {
         notes.push("target_unchecked");
+    }
+    for state in f.node_listener {
+        match state {
+            NodeListener::Unavailable => notes.push("node_context_unavailable"),
+            NodeListener::Mismatch => notes.push("node_listener_mismatch"),
+            NodeListener::NotUsed | NodeListener::Ok => {}
+        }
     }
     if f.recorded < f.planned_slots || f.invalid_samples > 0 {
         reasons.push("sample_count_short");
@@ -224,7 +181,27 @@ mod tests {
             nic_first: Some(nic("a")),
             targets: vec![],
             targets_unchecked: false,
+            node_listener: [NodeListener::Ok; 2],
         }
+    }
+
+    #[test]
+    fn node_listener_problems_annotate() {
+        let f = CycleFacts {
+            node_listener: [NodeListener::Unavailable, NodeListener::Mismatch],
+            nic_after: Sourced::unknown(),
+            ..facts()
+        };
+        let v = evaluate(&f);
+        assert!(v.valid);
+        assert_eq!(
+            v.annotations,
+            vec![
+                "node_context_unavailable",
+                "node_listener_mismatch",
+                "nic_path_unknown"
+            ]
+        );
     }
 
     fn target() -> TargetCycle {

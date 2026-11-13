@@ -9,7 +9,8 @@
 ```sh
 k8s-netmeasure listen [--port 17700] [--bind 0.0.0.0] [--backlog 4096] \
                       [--control-port 17701] [--control-bind auto] \
-                      [--node-name N] [--zone Z] [--instance-type T]
+                      [--node-name N] [--zone Z] [--instance-type T] \
+                      [--node-context-from <node-ip>:17701]
 ```
 
 | Flag | Default | Meaning |
@@ -20,6 +21,7 @@ k8s-netmeasure listen [--port 17700] [--bind 0.0.0.0] [--backlog 4096] \
 | `--control-bind` | `auto` | `auto` = the IPv4 address of the default-route interface (pod IP, or node IP with `hostNetwork`); `127.0.0.1` is then not served |
 | `--node-name` | `$NODE_NAME` | declared node name; `run` uses it as the target's name |
 | `--zone`, `--instance-type` | unknown | declared context; never used to infer the NIC family |
+| `--node-context-from` | none | control port of the node listener (a `listen` with `hostNetwork` on the same node); its NIC path is reported instead of the pod's own (`unknown`). Must be on the same node and see a NIC, else exit 3 |
 
 `listen` keeps the last 64 accepted connections open instead of closing each at
 once, so its FIN cannot reach the client before the client has checked the
@@ -44,8 +46,9 @@ curl -s http://10.0.0.5:17701/v1/context | jq '.nic'
 
 In a normal pod `nic` is `unknown`: a pod's network namespace has no physical
 interface. With `hostNetwork` it lists every physical interface with driver and
-ring sizes. Passing the node's NIC context to an overlay `listen`
-(`--node-context-from`) *follows*.
+ring sizes. With `--node-context-from` an overlay `listen` reports the node
+listener's NIC path (refreshed every second), marked `observed_via_node_listener`;
+if the node listener stops answering, `nic` is `unknown` until it answers again.
 
 ## Lifecycle
 

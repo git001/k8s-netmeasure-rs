@@ -137,7 +137,12 @@ must refuse the concurrent design (§10.6). The solution is a **node listener**:
 underlay `listen` (`hostNetwork`) on the same node, which observes the NIC.
 
 - **Fetching:** an overlay `run` or `listen` takes `--node-context-from
-  http://<node-ip>:17701` and fetches the node listener's `/v1/context`. `run` does so
+  <node-ip>:17701` (an `IPv4:port` like every other address of the tool; the URL
+  form of earlier drafts was dropped in milestone 3d) and fetches the node listener's
+  `/v1/context`. At start the node listener must also see a NIC path, i.e. run with
+  `hostNetwork`; otherwise exit 3. An overlay `listen` refreshes the node's NIC path
+  every second on its main thread and reports the cached value, so its control
+  thread never waits for the network. `run` does so
   before and after every cycle, like every other snapshot. An overlay `listen` includes
   the fetched NIC fields in its own `/v1/context`, so a target's NIC context reaches the
   source the same way.

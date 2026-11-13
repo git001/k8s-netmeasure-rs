@@ -11,7 +11,11 @@ use netmeasure_core::schema::nic::NicPath;
 use netmeasure_core::schema::result::TargetDiagnostics;
 use netmeasure_core::schema::sourced::Sourced;
 
+use netmeasure_cli::RunArgs;
+
 use crate::control::client::Client;
+use crate::diag::context;
+use crate::diag::node_listener::NodeListener;
 
 /// A target with a control port, as seen at the start of the run.
 pub struct Remote {
@@ -51,6 +55,32 @@ pub fn connect(
             })
         })
         .collect()
+}
+
+/// Targets' control ports and the node listener, checked at start. `Err` carries the
+/// message for a refused start (exit 3).
+pub fn connect_peers(args: &RunArgs, client: &mut Client) -> Result<Peers, String> {
+    let remotes = if args.no_target_control {
+        Vec::new()
+    } else {
+        connect(client, &args.target, args.target_control_port)
+            .map_err(|e| format!("target control port check failed (use --no-target-control for targets without one): {e}"))?
+    };
+    let node = match args.context.node_context_from {
+        Some(addr) => Some(NodeListener::connect(
+            client,
+            addr,
+            context::boot_id().as_deref(),
+        )?),
+        None => None,
+    };
+    Ok(Peers { remotes, node })
+}
+
+pub struct Peers {
+    pub remotes: Vec<Remote>,
+    /// The node listener and its context at start.
+    pub node: Option<(NodeListener, NodeContext)>,
 }
 
 /// One snapshot per target; `None` where the control port did not answer.

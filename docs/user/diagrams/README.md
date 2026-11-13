@@ -16,4 +16,5 @@ for f in docs/user/diagrams/*.dot; do dot -Tsvg "$f" -o "${f%.dot}.svg"; done
 | [slots.dot](slots.dot) | slot schedule: round-robin, loopback control, warm-up, cycles |
 | [cycle-validity.dot](cycle-validity.dot) | the validity reasons and annotations of a cycle |
 | [listen-probes.dot](listen-probes.dot) | `listen` lifecycle and its Kubernetes probe answers |
+| [node-listener.dot](node-listener.dot) | overlay measurement with a node listener (`--node-context-from`) |
 | [threads.dot](threads.dot) | threads of `run` and `listen` and how signals are handled |

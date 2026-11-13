@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--node-context-from <ip:port>` for `run`, `listen` and `selftest` (node listener,
+  design §5): the NIC path of an underlay `listen` on the same node, proven by equal
+  `boot_id`, stands in for the pod's own (`observed_via_node_listener`). Refused
+  start (exit 3) if it is unreachable, on another node or sees no NIC. `run` reads
+  it with every snapshot; an overlay `listen` refreshes it every second. New
+  annotations `node_context_unavailable` and `node_listener_mismatch`; new
+  `selftest` check `node-listener`.
 - README section "Why this tool exists": the problem, the two questions the tool
   answers, how it differs from existing tools, and what it is not.
 - User guide in `docs/user/`: concepts, `selftest` and `probe`, `listen`, `run` with

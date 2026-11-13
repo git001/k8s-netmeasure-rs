@@ -1,6 +1,8 @@
 //! Declared node context (design §5): Phase 1 has no API access, so node name, zone
 //! and instance type come from the operator or stay `unknown`.
 
+use std::net::SocketAddrV4;
+
 use clap::Args;
 
 #[derive(Debug, Clone, Default, Args)]
@@ -18,4 +20,10 @@ pub struct ContextArgs {
     /// NIC family, which is always observed.
     #[arg(long, env = "K8S_NETMEASURE_INSTANCE_TYPE")]
     pub instance_type: Option<String>,
+
+    /// Control port (IPv4:port) of an underlay `listen` (hostNetwork) on the same node.
+    /// Its NIC path is used as this process's NIC context, which a pod network
+    /// namespace cannot observe. The node listener's boot id must equal this one's.
+    #[arg(long, env = "K8S_NETMEASURE_NODE_CONTEXT_FROM", value_parser = crate::parse::ipv4_target)]
+    pub node_context_from: Option<SocketAddrV4>,
 }

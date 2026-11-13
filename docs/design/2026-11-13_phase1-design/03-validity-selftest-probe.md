@@ -20,6 +20,8 @@ Part of the [Phase 1 design](README.md) · covers §3.6–§3.9 · previous: [Me
 | `netns_listen_drops` | netns `ListenOverflows/ListenDrops` delta > 0 without own `sk_drops` | annotate only |
 | `nic_path_unknown` | the NIC path before or after the cycle is `unknown` (pod network namespace without a node listener, §5); added in milestone 3c2 so that an unobserved NIC path is never read as unchanged | annotate only |
 | `cpu_throttle_unchecked` | `--no-cgroup-check` was given (§3.7) | annotate only |
+| `node_context_unavailable` | the node listener (`--node-context-from`, §5) did not answer at a snapshot; the NIC path of that snapshot is unknown | annotate only |
+| `node_listener_mismatch` | the node listener reported another `boot_id`; it is no longer asked, the NIC path stays unknown | annotate only |
 | `target_unchecked` | `--no-target-control`: the targets have no control port, so `target_set_changed`, target listener drops and the targets' NIC path are not checked (milestone 3d) | annotate only |
 
 **NIC path** (added in milestone 2 planning). The same instance type can run on hosts
@@ -114,7 +116,7 @@ Checks (all unprivileged; the SYN checks need only loopback in the pod's own net
 | Timer slack / pacing | the same 1000 loopback connects, paced at the default interval with the real pacer (§3.4); so the loopback, pacing and signal checks share one ~10 s loop | wake-up lateness p50/p99/max, overruns |
 | cgroup v2 | read `cpu.max`, `cpu.stat`, visible ancestors (§3.7) | readable / not, quota value, ancestors visible or `unknown` |
 | Signal isolation | send **SIGUSR2** (no-op handler installed for this check) to the process during a paced connect loop. Not SIGTERM: that would trigger the shutdown path of §8 and end `selftest` with exit 143 | no EINTR seen in the measuring thread |
-| Node listener (with `--node-context-from`) | fetch `/v1/context`, compare `boot_id` | same node confirmed, or mismatch (§5). Arrives with `listen` in milestone 3; until then `selftest` has no such flag |
+| Node listener (with `--node-context-from`) | fetch `/v1/context`, compare `boot_id` | `confirmed`: same node and a NIC path visible; `unreliable`: another node, or no NIC path (not `hostNetwork`); `inconclusive`: not reachable (exit 6). Added in milestone 3d |
 
 - Output: one JSON log line per check (as everywhere), plus a summary table on
   stdout at the end, and `--output <file>` for a JSON report with build info and node

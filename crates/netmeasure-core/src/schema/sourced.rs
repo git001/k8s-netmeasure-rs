@@ -34,6 +34,11 @@ impl<T> Sourced<T> {
         Self::with(value, Source::Declared)
     }
 
+    /// `observed_via_node_listener` if there is a value, else `unknown` (§5).
+    pub fn via_node_listener(value: Option<T>) -> Self {
+        Self::with(value, Source::ObservedViaNodeListener)
+    }
+
     pub fn unknown() -> Self {
         Self::with(None, Source::Unknown)
     }
@@ -58,6 +63,14 @@ mod tests {
         assert_eq!(Sourced::declared(Some("a")).source, Source::Declared);
         assert_eq!(Sourced::<u8>::observed(None), Sourced::unknown());
         assert_eq!(Sourced::<u8>::declared(None).source, Source::Unknown);
+        assert_eq!(
+            Sourced::via_node_listener(Some(1)).source,
+            Source::ObservedViaNodeListener
+        );
+        assert_eq!(
+            Sourced::<u8>::via_node_listener(None).source,
+            Source::Unknown
+        );
     }
 
     #[test]

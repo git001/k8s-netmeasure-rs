@@ -3,6 +3,7 @@
 //! file. Exit 0 when every check established its result, 6 otherwise.
 
 mod lo;
+mod node;
 mod paced;
 mod report;
 mod syn;
@@ -23,6 +24,9 @@ pub fn run(args: &SelftestArgs, sources: &BTreeMap<String, &'static str>) -> Exi
     checks.push(total_rto(&checks));
     checks.extend(paced::run());
     checks.push(cgroup_check());
+    if let Some(addr) = args.node_context_from {
+        checks.push(node::check(addr));
+    }
     for c in &checks {
         tracing::info!(check = c.name, status = c.status.as_str(), summary = %c.summary, "selftest check");
         tracing::debug!(check = c.name, details = %c.details, "selftest check details");

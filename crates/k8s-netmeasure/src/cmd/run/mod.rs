@@ -24,6 +24,7 @@ use self::session::Session;
 use self::worker::Worker;
 use crate::control::client::Client;
 use crate::diag::context::{self, Declared};
+use crate::diag::node_listener;
 use crate::exit;
 use crate::listener::Listener;
 use crate::shutdown::{self, Shutdown};
@@ -66,20 +67,11 @@ pub fn run(args: &RunArgs, sources: &BTreeMap<String, &'static str>) -> ExitCode
             );
         }
     };
-    let remotes = if args.no_target_control {
-        Vec::new()
-    } else {
-        match remote::connect(&mut client, &args.target, args.target_control_port) {
-            Ok(r) => r,
-            Err(e) => {
-                return refuse(
-                    exit::REFUSED,
-                    "target control port check failed (use --no-target-control for targets without one)",
-                    &e,
-                );
-            }
-        }
+    let remote::Peers { remotes, node } = match remote::connect_peers(args, &mut client) {
+        Ok(p) => p,
+        Err(e) => return refuse(exit::REFUSED, "peer check failed", &e),
     };
+    let (mut node, node_context) = node.unzip();
     let lo = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0);
     let listener = match Listener::start(lo, args.backlog) {
         Ok(l) => l,
@@ -92,8 +84,12 @@ pub fn run(args: &RunArgs, sources: &BTreeMap<String, &'static str>) -> ExitCode
         }
     };
     let declared = Declared::from_args(&args.context);
-    let context_before = context::read_context(&declared);
-    let (path, path_source) = setup::path(args, context_before.nic.value.is_some());
+    let own = context::read_context(&declared);
+    let (path, path_source) = setup::path(args, own.nic.value.is_some());
+    let context_before = match &node_context {
+        Some(n) => node_listener::with_node_nic(own, n),
+        None => own,
+    };
     let mut targets = setup::targets(args, &listener.local.to_string(), &remotes);
     let run_id = ulid::Ulid::generate().to_string();
     let (origin_ns, origin_wall) = (time::monotonic_ns(), time::realtime_ns());
@@ -129,6 +125,7 @@ pub fn run(args: &RunArgs, sources: &BTreeMap<String, &'static str>) -> ExitCode
             wall: &wall,
         },
         &mut client,
+        node.as_mut(),
         worker,
     );
     for r in &remotes {
@@ -159,7 +156,10 @@ pub fn run(args: &RunArgs, sources: &BTreeMap<String, &'static str>) -> ExitCode
             .map(|(k, v)| (k.clone(), (*v).to_owned()))
             .collect(),
         cgroup,
-        context_after: Some(context::read_context(&declared)),
+        context_after: Some(match node.as_mut() {
+            Some(n) => n.context_after(&mut client, context::read_context(&declared)),
+            None => context::read_context(&declared),
+        }),
         context_before,
         targets,
         cycles: measured.cycles,

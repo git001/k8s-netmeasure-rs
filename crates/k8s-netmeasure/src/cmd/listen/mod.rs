@@ -12,6 +12,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 mod endpoints;
+mod node;
 
 use netmeasure_cli::{ControlBind, ListenArgs};
 
@@ -25,6 +26,8 @@ use crate::sys::time;
 
 /// How often the main thread checks for a shutdown signal.
 const TICK: Duration = Duration::from_millis(100);
+/// The node listener's NIC path is refreshed every `REFRESH_TICKS × TICK` (1 s).
+const REFRESH_TICKS: u32 = 10;
 
 pub fn run(args: &ListenArgs) -> ExitCode {
     if args.control_port == args.port {
@@ -44,6 +47,13 @@ pub fn run(args: &ListenArgs) -> ExitCode {
         );
         return exit::code(exit::REFUSED);
     };
+    let mut node = match node::connect(args) {
+        Ok(n) => n,
+        Err(e) => {
+            tracing::error!(error = %e, "node listener check failed");
+            return exit::code(exit::REFUSED);
+        }
+    };
     let addr = SocketAddrV4::new(args.bind, args.port);
     let listener = match Listener::start(addr, args.backlog) {
         Ok(l) => l,
@@ -55,7 +65,7 @@ pub fn run(args: &ListenArgs) -> ExitCode {
     let main_beat = Arc::new(AtomicU64::new(time::monotonic_ns()));
     let context = endpoints::initial_context(args);
     let state = Arc::new(State::new(
-        endpoints::endpoints(args, &listener),
+        endpoints::endpoints(args, &listener, node.as_ref().map(node::Node::cache)),
         endpoints::heartbeats(&listener, &main_beat),
     ));
     let control_addr = SocketAddrV4::new(control_ip, args.control_port);
@@ -80,14 +90,23 @@ pub fn run(args: &ListenArgs) -> ExitCode {
         node_name = context.node_name.value.as_deref(),
         boot_id = context.boot_id.value.as_deref(),
         nic = context.nic.value.is_some(),
+        node_context_from = args.context.node_context_from.map(|a| a.to_string()),
         "listening"
     );
     let signal = loop {
-        main_beat.store(time::monotonic_ns(), Ordering::Relaxed);
+        for _ in 0..REFRESH_TICKS {
+            main_beat.store(time::monotonic_ns(), Ordering::Relaxed);
+            if shutdown.requested().is_some() {
+                break;
+            }
+            std::thread::sleep(TICK);
+        }
         if let Some(s) = shutdown.requested() {
             break s;
         }
-        std::thread::sleep(TICK);
+        if let Some(n) = node.as_mut() {
+            n.refresh();
+        }
     };
     state.mark_stopping();
     let drops = listener.drops();

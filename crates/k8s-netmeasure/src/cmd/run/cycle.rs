@@ -66,6 +66,7 @@ pub fn record(d: Done<'_>) -> (Cycle, CycleDiagnostics) {
             })
             .collect(),
         targets_unchecked: d.targets_unchecked,
+        node_listener: [d.before.node_listener, d.after.node_listener],
     });
     let (target_diag, target_drops): (Vec<_>, Vec<_>) = (0..d.remotes.len())
         .map(|i| remote::diagnostics(d.before.targets[i].as_ref(), d.after.targets[i].as_ref()))

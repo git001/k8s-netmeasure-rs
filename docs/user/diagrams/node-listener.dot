@@ -1,0 +1,28 @@
+// Overlay measurement with a node listener: the pod cannot see the NIC, the
+// hostNetwork listen on the same node can; equal boot ids prove the same node.
+digraph node_listener {
+  graph [rankdir=LR, fontname="Helvetica", fontsize=11, nodesep=0.5, ranksep=0.8, pad=0.3,
+         label="Overlay with a node listener (--node-context-from)", labelloc=t];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, fillcolor="#eef3fb", color="#4a6fa5"];
+  edge  [fontname="Helvetica", fontsize=9, color="#555555"];
+
+  subgraph cluster_a {
+    label="node A (one kernel, one boot_id)"; style="rounded,dashed"; color="#888888"; fontsize=10;
+    run   [label="run (normal pod)\nnic: observed_via_node_listener"];
+    nodeA [label="listen, hostNetwork\n(node listener)\nsees NIC: driver, rings", fillcolor="#e3f2e1", color="#2e7d32"];
+    nicA  [label="physical NIC", shape=component, fillcolor="#f4f4f4", color="#777777"];
+    nodeA -> nicA [label="ethtool,\n/sys/class/net", style=dotted];
+  }
+  subgraph cluster_b {
+    label="node B"; style="rounded,dashed"; color="#888888"; fontsize=10;
+    target [label="listen (normal pod)\n--node-context-from B:17701"];
+    nodeB  [label="listen, hostNetwork\n(node listener)", fillcolor="#e3f2e1", color="#2e7d32"];
+    nicB   [label="physical NIC", shape=component, fillcolor="#f4f4f4", color="#777777"];
+    nodeB -> nicB [style=dotted];
+  }
+
+  run -> nodeA   [label="/v1/context at start:\nsame boot_id? NIC visible?\n/v1/snapshot per cycle", style=dashed];
+  target -> nodeB [label="every second", style=dashed];
+  run -> target  [label="measured connects\n(pod network)", color="#2e7d32", fontcolor="#2e7d32", penwidth=1.6];
+  run -> target  [label="/v1/snapshot: target NIC path\n(from node B)", style=dashed, constraint=false];
+}
