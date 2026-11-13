@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Node facts list every physical interface with its driver and RX/TX ring sizes
   (current and maximum, `ethtool -g` equivalent, no capability needed); a size the
   driver does not report is `null`. `selftest --output` includes them.
+- Node facts include the CPU model and microcode revision of the first processor
+  (`/proc/cpuinfo`); `selftest --output` includes them.
 - `--log-level` (`K8S_NETMEASURE_LOG_LEVEL`) on every subcommand: `error`, `warn`,
   `info` (default), `debug`, `trace`; `debug` logs parameter sources and full
   `selftest` check data.

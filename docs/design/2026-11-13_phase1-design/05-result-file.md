@@ -80,7 +80,9 @@ JSON.
 **Node context** fields: node name, zone, instance type, kernel (`uname -r`, `-v`),
 boot_id, uptime, CPU quota, **CPU model** (`/proc/cpuinfo` `model name`, plus
 `microcode`; added in milestone 2 planning: hosts behind the same instance type can
-differ in CPU as well as NIC), `somaxconn`, `tcp_syn_retries`,
+differ in CPU as well as NIC; in the node facts and `selftest --output` since the
+first cluster `selftest`, which showed loopback latency differing by 4× between
+nodes), `somaxconn`, `tcp_syn_retries`,
 `tcp_syn_linear_timeouts`, MTU, and per physical interface (anything with
 `/sys/class/net/*/device`): driver, driver version, firmware, ring sizes, channels.
 **The NIC family is always observed, never derived from the instance type** (§10.7).

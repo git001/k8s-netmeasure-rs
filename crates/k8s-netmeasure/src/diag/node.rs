@@ -1,10 +1,11 @@
 //! Node facts needed by `selftest` (the full node context of §5 follows in
-//! milestone 3): kernel, boot id, TCP sysctls, netstat counters, and per physical
-//! interface the driver and ring sizes.
+//! milestone 3): kernel, boot id, CPU model and microcode, TCP sysctls, netstat
+//! counters, and per physical interface the driver and ring sizes.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use netmeasure_core::diag::cpuinfo::{self, CpuInfo};
 use netmeasure_core::diag::netstat;
 use serde::Serialize;
 
@@ -15,6 +16,8 @@ pub struct NodeFacts {
     pub kernel_release: Option<String>,
     pub kernel_version: Option<String>,
     pub boot_id: Option<String>,
+    /// `/proc/cpuinfo` of the first processor; both fields `None` if unreadable.
+    pub cpu: CpuInfo,
     pub tcp_syn_retries: Option<u32>,
     /// `None` if the sysctl does not exist on this kernel.
     pub tcp_syn_linear_timeouts: Option<u32>,
@@ -67,6 +70,7 @@ pub fn read() -> NodeFacts {
         kernel_release: text("/proc/sys/kernel/osrelease"),
         kernel_version: text("/proc/sys/kernel/version"),
         boot_id: text("/proc/sys/kernel/random/boot_id"),
+        cpu: cpuinfo::parse(&super::read("/proc/cpuinfo").unwrap_or_default()),
         tcp_syn_retries: number("/proc/sys/net/ipv4/tcp_syn_retries"),
         tcp_syn_linear_timeouts: number("/proc/sys/net/ipv4/tcp_syn_linear_timeouts"),
         somaxconn: number("/proc/sys/net/core/somaxconn"),
