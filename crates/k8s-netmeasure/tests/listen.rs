@@ -4,51 +4,18 @@
 
 mod common;
 
-use std::net::{TcpListener, TcpStream};
-use std::process::Child;
-use std::time::{Duration, Instant};
+use std::net::TcpListener;
 
-use nix::sys::signal::{Signal, kill};
-use nix::unistd::Pid;
+use nix::sys::signal::Signal;
 
-use common::{bin, closed_port, spawn, stdout};
-
-/// Starts `listen` on a free loopback port and waits until it accepts.
-fn start() -> (Child, String) {
-    let addr = closed_port();
-    let port = addr.rsplit(':').next().unwrap().to_owned();
-    let child = spawn(&["listen", "--bind", "127.0.0.1", "--port", &port]);
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while TcpStream::connect(&addr).is_err() {
-        assert!(
-            Instant::now() < deadline,
-            "listen did not come up on {addr}"
-        );
-        std::thread::sleep(Duration::from_millis(20));
-    }
-    (child, addr)
-}
-
-fn stop_with(mut child: Child, signal: Signal) -> (i32, String) {
-    kill(Pid::from_raw(child.id() as i32), signal).unwrap();
-    let deadline = Instant::now() + Duration::from_secs(10);
-    loop {
-        if let Some(status) = child.try_wait().unwrap() {
-            let out = child.wait_with_output().unwrap();
-            let log =
-                String::from_utf8(out.stdout).unwrap() + &String::from_utf8(out.stderr).unwrap();
-            return (status.code().expect("exit code, not a signal"), log);
-        }
-        assert!(Instant::now() < deadline, "listen did not stop");
-        std::thread::sleep(Duration::from_millis(20));
-    }
-}
+use common::listen::{start, stop_with};
+use common::{bin, stdout};
 
 #[test]
 fn probe_against_listen_is_ok_and_sigterm_exits_143() {
-    let (child, addr) = start();
+    let l = start();
     let out = bin()
-        .args(["probe", "--target", &addr, "--count", "20"])
+        .args(["probe", "--target", &l.addr, "--count", "20"])
         .assert()
         .code(0);
     for line in stdout(&out).lines() {
@@ -56,7 +23,7 @@ fn probe_against_listen_is_ok_and_sigterm_exits_143() {
         assert_eq!(v["outcome"], "ok", "{line}");
         assert_eq!(v["peer_closed"], false, "listen holds connections: {line}");
     }
-    let (code, log) = stop_with(child, Signal::SIGTERM);
+    let (code, log) = stop_with(l.child, Signal::SIGTERM);
     assert_eq!(code, 143, "{log}");
     assert!(log.contains("\"message\":\"listening\""), "{log}");
     assert!(log.contains("\"message\":\"shut down\""), "{log}");
@@ -64,8 +31,7 @@ fn probe_against_listen_is_ok_and_sigterm_exits_143() {
 
 #[test]
 fn sigint_exits_130() {
-    let (child, _) = start();
-    let (code, log) = stop_with(child, Signal::SIGINT);
+    let (code, log) = stop_with(start().child, Signal::SIGINT);
     assert_eq!(code, 130, "{log}");
 }
 
@@ -74,18 +40,30 @@ fn port_in_use_is_refused_with_exit_3() {
     let taken = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = taken.local_addr().unwrap().port().to_string();
     bin()
-        .args(["listen", "--bind", "127.0.0.1", "--port", &port])
+        .args([
+            "listen",
+            "--bind",
+            "127.0.0.1",
+            "--port",
+            &port,
+            "--control-bind",
+            "127.0.0.1",
+        ])
         .assert()
         .code(3);
 }
 
 #[test]
 fn invalid_port_and_backlog_are_usage_errors() {
-    for args in [
-        ["listen", "--port", "0"],
-        ["listen", "--backlog", "0"],
-        ["listen", "--backlog", "65536"],
-    ] {
+    let cases: [&[&str]; 6] = [
+        &["listen", "--port", "0"],
+        &["listen", "--backlog", "0"],
+        &["listen", "--backlog", "65536"],
+        &["listen", "--control-port", "0"],
+        &["listen", "--control-bind", "::1"],
+        &["listen", "--port", "17700", "--control-port", "17700"],
+    ];
+    for args in cases {
         bin().args(args).assert().code(2);
     }
 }

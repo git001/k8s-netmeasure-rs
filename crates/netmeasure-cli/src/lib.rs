@@ -19,7 +19,7 @@ pub mod surface;
 
 use clap::{Command, CommandFactory, Parser, Subcommand};
 
-pub use crate::listen::ListenArgs;
+pub use crate::listen::{ControlBind, ListenArgs};
 pub use crate::log::{LogArgs, LogLevel};
 pub use crate::probe::ProbeArgs;
 pub use crate::selftest::SelftestArgs;

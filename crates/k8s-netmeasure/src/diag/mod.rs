@@ -2,6 +2,7 @@
 //! `netmeasure_core::diag`.
 
 pub mod cgroup;
+pub mod net;
 pub mod node;
 
 /// Reads a small text file; `None` if it does not exist or is unreadable.

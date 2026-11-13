@@ -95,6 +95,11 @@ impl Listener {
         })
     }
 
+    /// The live counters, e.g. for the accept thread's heartbeat (design §7).
+    pub fn counters(&self) -> Arc<Counters> {
+        Arc::clone(&self.counters)
+    }
+
     pub fn stats(&self) -> Stats {
         let c = &self.counters;
         Stats {

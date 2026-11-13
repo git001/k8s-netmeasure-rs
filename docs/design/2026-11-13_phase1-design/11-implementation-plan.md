@@ -26,7 +26,8 @@ milestone ends with something that runs and is reviewed before the next one star
 3. **`listen` + `run` + result file.** Listener, control port, cycles, validity,
    shutdown behaviour and its tests, atomic writing, the schema. Split into five
    reviewable steps: 3a `listen` with the measured port (accept thread, signals);
-   3b control port and node context; 3c `run` with own snapshots, validity and the
+   3b control port (3b1: server, probes, `/v1/info`, watchdog; 3b2: `/v1/context`,
+   `/v1/snapshot`); 3c `run` with own snapshots, validity and the
    result file; 3d `run` against targets' control ports and `--node-context-from`;
    3e shutdown deadline, example manifests, README.
 4. **Statistics with the simulation suite.** Quantiles, order-statistic CI, block

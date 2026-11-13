@@ -7,6 +7,7 @@
 #![allow(unsafe_code)]
 
 pub mod ethtool;
+pub mod ifaddr;
 pub mod poll;
 pub mod sigaction;
 pub mod signals;

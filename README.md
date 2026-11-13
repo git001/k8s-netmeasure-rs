@@ -3,8 +3,9 @@
 Reproducible TCP connect-latency measurement in Kubernetes and OpenShift.
 
 **Status: milestone 3 of the [Phase 1 implementation plan](docs/design/2026-11-13_phase1-design/11-implementation-plan.md)
-in progress:** `probe`, `selftest` and `listen` (measured port only; the control port
-follows). `run` and `report` follow. The design is in
+in progress:** `probe`, `selftest` and `listen` (measured port and control port with
+probes and `/v1/info`; `/v1/context` and `/v1/snapshot` follow). `run` and `report`
+follow. The design is in
 [docs/design/2026-11-13_phase1-design/](docs/design/2026-11-13_phase1-design/README.md).
 
 ## Subcommands so far
@@ -14,7 +15,8 @@ follows). `run` and `report` follow. The design is in
 k8s-netmeasure selftest [--output selftest.json]
 
 # Measurement target: accepts on the measured port until SIGTERM/SIGINT (exit 143/130).
-k8s-netmeasure listen [--port 17700] [--bind 0.0.0.0] [--backlog 4096]
+k8s-netmeasure listen [--port 17700] [--bind 0.0.0.0] [--backlog 4096] \
+                      [--control-port 17701] [--control-bind auto]
 
 # Manual cross-check of one path, same code path as the measurement (not a measurement).
 k8s-netmeasure probe --target 10.0.0.5:17700 [--count 5] [--timeout 5s]
@@ -35,6 +37,23 @@ client before the client has checked the connection. The effective backlog is
 `min(--backlog, net.core.somaxconn)` and is logged at start. A port that cannot be bound
 ends the process with exit 3. On shutdown it logs the accepted, aborted and failed
 accepts and the listener's SYN drops (`SK_MEMINFO_DROPS`).
+
+The control port is plain HTTP/1.1 with JSON and is never measured:
+
+| Path | Answer |
+|---|---|
+| `GET /startup` | 200 once both ports are bound, 503 before |
+| `GET /live` | 200 unless the accept or main thread is stalled (> 5 s); never depends on the network |
+| `GET /ready` | 200 while accepting; 503 before startup and from the first SIGTERM/SIGINT on |
+| `GET /v1/info` | build info, `listener_instance` (ULID, new per start), measured address, backlog |
+
+An unknown path is 404, any method other than `GET` 405, any query string 400.
+`--control-bind auto` (default) binds the IPv4 address of the interface with the
+default route: the pod IP in a pod, the node IP with `hostNetwork`. `127.0.0.1` is
+then not served, so `oc port-forward` needs `--control-bind 0.0.0.0`. With
+`hostNetwork`, NetworkPolicy does not apply and the control port is reachable for
+anyone who can reach the node; it has no authentication. `--control-port` must
+differ from `--port` (exit 2).
 
 `probe` measures TCP connection establishment only: one JSON line per connect with
 the duration, the outcome, the errno, the SYN retransmissions and `peer_closed` (the

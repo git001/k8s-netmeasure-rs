@@ -1,6 +1,8 @@
 //! Helpers shared by the end-to-end tests.
 #![allow(dead_code)] // each test crate uses a different subset
 
+pub mod listen;
+
 use std::net::TcpListener;
 
 use assert_cmd::Command;

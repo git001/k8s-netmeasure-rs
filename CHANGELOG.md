@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `listen` control port (HTTP/1.1 + JSON on its own thread, tokio `current_thread` +
+  hyper): `GET /startup`, `/live` (watchdog over the accept and main threads, 5 s),
+  `/ready` (503 from the first shutdown signal on) and `/v1/info` (build info,
+  `listener_instance` ULID, measured address, backlog). Unknown path 404, other
+  methods 405, any query 400. `--control-port` (default 17701, must differ from
+  `--port`, exit 2) and `--control-bind` (default `auto`: the IPv4 address of the
+  default-route interface; exit 3 if there is none). `/v1/context` and
+  `/v1/snapshot` follow.
 - `listen` subcommand, measured port only (control port follows): `--port` (default
   17700), `--bind` (default `0.0.0.0`), `--backlog` (default 4096, effective
   `min(backlog, somaxconn)`, logged). A dedicated accept thread keeps the last 64

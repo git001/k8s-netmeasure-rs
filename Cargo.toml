@@ -31,7 +31,12 @@ netmeasure-core = { path = "crates/netmeasure-core" }
 netmeasure-cli = { path = "crates/netmeasure-cli" }
 clap = { version = "4.6.7", features = ["derive", "env"] }
 libc = "0.2.191"
-nix = { version = "0.31.3", default-features = false, features = ["signal", "poll", "time", "process", "pthread"] }
+nix = { version = "0.31.3", default-features = false, features = ["signal", "poll", "time", "process", "pthread", "net"] }
+http-body-util = "0.1.5"
+hyper = { version = "1.12.0", default-features = false, features = ["server", "client", "http1"] }
+hyper-util = { version = "0.1.21", default-features = false, features = ["tokio"] }
+tokio = { version = "1.54.1", default-features = false, features = ["rt", "net", "time"] }
+ulid = "3.0.0"
 socket2 = { version = "0.6.5", features = ["all"] }
 serde = { version = "1.0.229", features = ["derive"] }
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }

@@ -7,6 +7,7 @@
 
 mod build_info;
 mod cmd;
+mod control;
 mod diag;
 mod exit;
 mod listener;
