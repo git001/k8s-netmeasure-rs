@@ -1,6 +1,7 @@
 //! What the control server reports (design §7): startup and shutdown flags, the
-//! preassembled `/v1/info` body and the heartbeats of the watched threads. The server
-//! only reads atomics and preassembled values, so it never blocks another thread.
+//! endpoint bodies and the heartbeats of the watched threads. Bodies are built on the
+//! control thread from atomics, `/proc`, `/sys` and one `ioctl` per interface, so a
+//! request never blocks another thread.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -12,19 +13,29 @@ pub struct Heartbeat {
     pub bound_ns: u64,
 }
 
+/// A body built on request.
+pub type Body = Box<dyn Fn() -> serde_json::Value + Send + Sync>;
+
+/// The bodies of `/v1/info` (fixed), `/v1/context` and `/v1/snapshot`.
+pub struct Endpoints {
+    pub info: serde_json::Value,
+    pub context: Body,
+    pub snapshot: Body,
+}
+
 pub struct State {
     started: AtomicBool,
     stopping: AtomicBool,
-    info: serde_json::Value,
+    endpoints: Endpoints,
     heartbeats: Vec<Heartbeat>,
 }
 
 impl State {
-    pub fn new(info: serde_json::Value, heartbeats: Vec<Heartbeat>) -> State {
+    pub fn new(endpoints: Endpoints, heartbeats: Vec<Heartbeat>) -> State {
         State {
             started: AtomicBool::new(false),
             stopping: AtomicBool::new(false),
-            info,
+            endpoints,
             heartbeats,
         }
     }
@@ -47,8 +58,8 @@ impl State {
         self.stopping.load(Ordering::SeqCst)
     }
 
-    pub fn info(&self) -> &serde_json::Value {
-        &self.info
+    pub fn endpoints(&self) -> &Endpoints {
+        &self.endpoints
     }
 
     /// Names of the threads whose heartbeat is older than their bound at `now_ns`.
@@ -72,7 +83,11 @@ mod tests {
         let beat = Arc::new(AtomicU64::new(1_000));
         let b = Arc::clone(&beat);
         let s = State::new(
-            serde_json::json!({ "k": 1 }),
+            Endpoints {
+                info: serde_json::json!({ "k": 1 }),
+                context: Box::new(|| serde_json::json!({ "c": 2 })),
+                snapshot: Box::new(|| serde_json::json!({ "s": 3 })),
+            },
             vec![Heartbeat {
                 name: "accept",
                 read: Box::new(move || b.load(Ordering::Relaxed)),
@@ -83,7 +98,9 @@ mod tests {
         s.mark_started();
         s.mark_stopping();
         assert!(s.started() && s.stopping());
-        assert_eq!(s.info()["k"], 1);
+        assert_eq!(s.endpoints().info["k"], 1);
+        assert_eq!((s.endpoints().context)()["c"], 2);
+        assert_eq!((s.endpoints().snapshot)()["s"], 3);
         assert!(s.stalled(1_100).is_empty());
         assert_eq!(s.stalled(1_101), vec!["accept"]);
     }

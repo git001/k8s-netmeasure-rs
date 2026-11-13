@@ -51,10 +51,37 @@ pub struct Listener {
     pub local: SocketAddrV4,
     /// `min(backlog, somaxconn)`; `backlog` if `somaxconn` is unreadable.
     pub effective_backlog: u32,
-    socket: Arc<Socket>,
-    counters: Arc<Counters>,
+    handle: Handle,
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
+}
+
+/// Read access to a running listener from another thread (control port, §7).
+#[derive(Clone)]
+pub struct Handle {
+    socket: Arc<Socket>,
+    counters: Arc<Counters>,
+}
+
+impl Handle {
+    pub fn stats(&self) -> Stats {
+        let c = &self.counters;
+        Stats {
+            accepted: c.accepted.load(Ordering::Relaxed),
+            aborted: c.aborted.load(Ordering::Relaxed),
+            errors: c.errors.load(Ordering::Relaxed),
+            heartbeat_ns: c.heartbeat_ns.load(Ordering::Relaxed),
+        }
+    }
+
+    /// `SK_MEMINFO_DROPS` of the listening socket (design §4.2): SYNs dropped because
+    /// the accept queue was full.
+    pub fn drops(&self) -> Field<u32> {
+        match sockopt::meminfo(self.socket.as_fd()) {
+            Ok((buf, len)) => decode_meminfo_drops(sockopt::SK_MEMINFO_DROPS, &buf, len),
+            Err(_) => Field::Unknown,
+        }
+    }
 }
 
 impl Listener {
@@ -88,42 +115,25 @@ impl Listener {
         Ok(Listener {
             local,
             effective_backlog: somaxconn.map_or(backlog, |m| m.min(backlog)),
-            socket,
-            counters,
+            handle: Handle { socket, counters },
             stop,
             thread: Some(thread),
         })
     }
 
-    /// The live counters, e.g. for the accept thread's heartbeat (design §7).
-    pub fn counters(&self) -> Arc<Counters> {
-        Arc::clone(&self.counters)
+    pub fn handle(&self) -> Handle {
+        self.handle.clone()
     }
 
-    pub fn stats(&self) -> Stats {
-        let c = &self.counters;
-        Stats {
-            accepted: c.accepted.load(Ordering::Relaxed),
-            aborted: c.aborted.load(Ordering::Relaxed),
-            errors: c.errors.load(Ordering::Relaxed),
-            heartbeat_ns: c.heartbeat_ns.load(Ordering::Relaxed),
-        }
-    }
-
-    /// `SK_MEMINFO_DROPS` of the listening socket (design §4.2): SYNs dropped because
-    /// the accept queue was full.
     pub fn drops(&self) -> Field<u32> {
-        match sockopt::meminfo(self.socket.as_fd()) {
-            Ok((buf, len)) => decode_meminfo_drops(sockopt::SK_MEMINFO_DROPS, &buf, len),
-            Err(_) => Field::Unknown,
-        }
+        self.handle.drops()
     }
 
     /// Stops accepting, joins the accept thread and closes everything; returns the
     /// final counters.
     pub fn stop(mut self) -> Stats {
         self.shut_down();
-        self.stats()
+        self.handle.stats()
     }
 
     fn shut_down(&mut self) {
@@ -198,12 +208,12 @@ mod tests {
 
     fn wait_for(l: &Listener, accepted: u64) {
         for _ in 0..500 {
-            if l.stats().accepted >= accepted {
+            if l.handle().stats().accepted >= accepted {
                 return;
             }
             std::thread::sleep(Duration::from_millis(2));
         }
-        panic!("accepted {} of {accepted}", l.stats().accepted);
+        panic!("accepted {} of {accepted}", l.handle().stats().accepted);
     }
 
     #[test]
@@ -239,7 +249,7 @@ mod tests {
     fn stop_is_fast_and_heartbeat_advances() {
         let l = loopback();
         std::thread::sleep(Duration::from_millis(20));
-        assert!(l.stats().heartbeat_ns > 0);
+        assert!(l.handle().stats().heartbeat_ns > 0);
         assert!(l.effective_backlog <= 128);
         assert_eq!(l.drops(), Field::Known(0));
         let t = std::time::Instant::now();

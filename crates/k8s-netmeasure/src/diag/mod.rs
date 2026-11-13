@@ -2,8 +2,8 @@
 //! `netmeasure_core::diag`.
 
 pub mod cgroup;
+pub mod context;
 pub mod net;
-pub mod node;
 
 /// Reads a small text file; `None` if it does not exist or is unreadable.
 pub fn read(path: &str) -> Option<String> {

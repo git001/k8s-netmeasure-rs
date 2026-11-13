@@ -9,6 +9,7 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::too_many_arguments)]
 
+pub mod context;
 pub mod env;
 pub mod listen;
 pub mod log;
@@ -19,6 +20,7 @@ pub mod surface;
 
 use clap::{Command, CommandFactory, Parser, Subcommand};
 
+pub use crate::context::ContextArgs;
 pub use crate::listen::{ControlBind, ListenArgs};
 pub use crate::log::{LogArgs, LogLevel};
 pub use crate::probe::ProbeArgs;

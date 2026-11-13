@@ -13,7 +13,7 @@ use serde_json::json;
 
 use super::lo;
 use super::report::{Check, Status};
-use crate::diag::node;
+use crate::diag::net;
 use crate::measure::{connect, thread};
 use crate::sys::sockopt;
 
@@ -55,7 +55,7 @@ fn measure() -> std::io::Result<Observed> {
         }
     }
     let drops_before = drops(&listener);
-    let ld_before = node::netstat().get("TcpExt.ListenDrops").copied();
+    let ld_before = net::netstat().get("TcpExt.ListenDrops").copied();
     let acceptor = std::thread::spawn(move || {
         std::thread::sleep(ACCEPT_AFTER);
         let _ = listener.accept();
@@ -66,7 +66,7 @@ fn measure() -> std::io::Result<Observed> {
         .join()
         .map_err(|_| std::io::Error::other("acceptor panicked"))?;
     let drops_after = drops(&listener);
-    let ld_after = node::netstat().get("TcpExt.ListenDrops").copied();
+    let ld_after = net::netstat().get("TcpExt.ListenDrops").copied();
     Ok(Observed {
         stalled,
         filled: held.len(),

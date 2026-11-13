@@ -3,9 +3,8 @@
 Reproducible TCP connect-latency measurement in Kubernetes and OpenShift.
 
 **Status: milestone 3 of the [Phase 1 implementation plan](docs/design/2026-11-13_phase1-design/11-implementation-plan.md)
-in progress:** `probe`, `selftest` and `listen` (measured port and control port with
-probes and `/v1/info`; `/v1/context` and `/v1/snapshot` follow). `run` and `report`
-follow. The design is in
+in progress:** `probe`, `selftest` and `listen` (measured port and control port).
+`run` and `report` follow. The design is in
 [docs/design/2026-11-13_phase1-design/](docs/design/2026-11-13_phase1-design/README.md).
 
 ## Subcommands so far
@@ -16,7 +15,8 @@ k8s-netmeasure selftest [--output selftest.json]
 
 # Measurement target: accepts on the measured port until SIGTERM/SIGINT (exit 143/130).
 k8s-netmeasure listen [--port 17700] [--bind 0.0.0.0] [--backlog 4096] \
-                      [--control-port 17701] [--control-bind auto]
+                      [--control-port 17701] [--control-bind auto] \
+                      [--node-name N] [--zone Z] [--instance-type T]
 
 # Manual cross-check of one path, same code path as the measurement (not a measurement).
 k8s-netmeasure probe --target 10.0.0.5:17700 [--count 5] [--timeout 5s]
@@ -46,6 +46,8 @@ The control port is plain HTTP/1.1 with JSON and is never measured:
 | `GET /live` | 200 unless the accept or main thread is stalled (> 5 s); never depends on the network |
 | `GET /ready` | 200 while accepting; 503 before startup and from the first SIGTERM/SIGINT on |
 | `GET /v1/info` | build info, `listener_instance` (ULID, new per start), measured address, backlog |
+| `GET /v1/context` | node context; every field as `{"value": …, "source": "observed" \| "declared" \| "unknown"}`: kernel, boot id, uptime, CPU model and microcode, own `cpu.max`, TCP sysctls, MTU of the default-route interface, NIC path (physical interfaces with driver and ring sizes, default-route interface; `unknown` in a pod network namespace) |
+| `GET /v1/snapshot` | monotonic time, boot id, `listener_instance`, accepted/aborted/failed accepts, listener SYN drops, netns `ListenOverflows`/`ListenDrops`, own `cpu.stat`, NIC path |
 
 An unknown path is 404, any method other than `GET` 405, any query string 400.
 `--control-bind auto` (default) binds the IPv4 address of the interface with the
@@ -54,6 +56,10 @@ then not served, so `oc port-forward` needs `--control-bind 0.0.0.0`. With
 `hostNetwork`, NetworkPolicy does not apply and the control port is reachable for
 anyone who can reach the node; it has no authentication. `--control-port` must
 differ from `--port` (exit 2).
+
+`--node-name` (default: the `NODE_NAME` environment variable, e.g. from the Downward
+API), `--zone` and `--instance-type` are declared, not observed; without them the
+fields are `unknown`. The NIC family is never derived from the instance type.
 
 `probe` measures TCP connection establishment only: one JSON line per connect with
 the duration, the outcome, the errno, the SYN retransmissions and `peer_closed` (the

@@ -6,10 +6,11 @@
 //! and pulls in `nix` and `zbus`. The formats are small and documented in the kernel's
 //! cgroup-v2 documentation.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// `cpu.max`: `max <period>` or `<quota> <period>` (µs).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CpuMax {
     /// `None` = unlimited (`max`).
     pub quota_us: Option<u64>,
@@ -46,7 +47,8 @@ pub fn parse_cpu_max(text: &str) -> Result<CpuMax, String> {
 }
 
 /// The throttling counters of `cpu.stat`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CpuStat {
     pub nr_periods: u64,
     pub nr_throttled: u64,

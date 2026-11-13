@@ -7,7 +7,14 @@ use serde_json::{Value, json};
 
 use super::state::State;
 
-const PATHS: [&str; 4] = ["/startup", "/live", "/ready", "/v1/info"];
+const PATHS: [&str; 6] = [
+    "/startup",
+    "/live",
+    "/ready",
+    "/v1/info",
+    "/v1/context",
+    "/v1/snapshot",
+];
 
 pub fn respond(
     state: &State,
@@ -44,7 +51,9 @@ pub fn respond(
         "/ready" if state.stopping() => status(StatusCode::SERVICE_UNAVAILABLE, "stopping"),
         "/ready" if state.started() => status(StatusCode::OK, "ready"),
         "/ready" => status(StatusCode::SERVICE_UNAVAILABLE, "starting"),
-        _ => (StatusCode::OK, state.info().clone()),
+        "/v1/info" => (StatusCode::OK, state.endpoints().info.clone()),
+        "/v1/context" => (StatusCode::OK, (state.endpoints().context)()),
+        _ => (StatusCode::OK, (state.endpoints().snapshot)()),
     }
 }
 
@@ -59,11 +68,15 @@ fn error(code: StatusCode, text: String) -> (StatusCode, Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::control::state::Heartbeat;
+    use crate::control::state::{Endpoints, Heartbeat};
 
     fn state(beat: u64) -> State {
         State::new(
-            json!({ "listener_instance": "x" }),
+            Endpoints {
+                info: json!({ "listener_instance": "x" }),
+                context: Box::new(|| json!({ "boot_id": { "value": "b", "source": "observed" } })),
+                snapshot: Box::new(|| json!({ "monotonic_ns": 1 })),
+            },
             vec![Heartbeat {
                 name: "main",
                 read: Box::new(move || beat),
@@ -103,6 +116,8 @@ mod tests {
         assert_eq!(get(&s, "/startup").0, StatusCode::OK);
         assert_eq!(get(&s, "/ready").0, StatusCode::OK);
         assert_eq!(get(&s, "/v1/info").1["listener_instance"], "x");
+        assert_eq!(get(&s, "/v1/context").1["boot_id"]["value"], "b");
+        assert_eq!(get(&s, "/v1/snapshot").1["monotonic_ns"], 1);
         s.mark_stopping();
         assert_eq!(get(&s, "/ready").1["status"], "stopping");
         assert_eq!(get(&s, "/startup").0, StatusCode::OK, "startup stays 200");

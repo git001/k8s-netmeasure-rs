@@ -18,12 +18,19 @@ pub const BUILD_INFO: BuildInfo = BuildInfo {
 };
 
 impl BuildInfo {
-    /// The `build_info` object of result and report files (§5).
+    /// The `build_info` object of result, report and control-port bodies (§5, §7).
+    pub fn schema(&self) -> netmeasure_core::schema::control::BuildInfo {
+        netmeasure_core::schema::control::BuildInfo {
+            version: self.version.into(),
+            git_sha: self.git_sha.into(),
+            rustc: self.rustc.into(),
+            target: self.target.into(),
+            is_static: self.is_static,
+        }
+    }
+
     pub fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "version": self.version, "git_sha": self.git_sha, "rustc": self.rustc,
-            "target": self.target, "static": self.is_static,
-        })
+        serde_json::to_value(self.schema()).unwrap_or(serde_json::Value::Null)
     }
 
     /// One line for `--version`, e.g.

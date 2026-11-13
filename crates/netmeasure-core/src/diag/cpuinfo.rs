@@ -4,9 +4,10 @@
 //! Own code on purpose: two `key : value` lines do not justify a dependency
 //! (`procfs` would bring far more than this).
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CpuInfo {
     /// `model name` of the first processor.
     pub model: Option<String>,

@@ -59,6 +59,9 @@ pub struct ListenArgs {
     pub control_bind: ControlBind,
 
     #[command(flatten)]
+    pub context: crate::ContextArgs,
+
+    #[command(flatten)]
     pub log: crate::LogArgs,
 }
 

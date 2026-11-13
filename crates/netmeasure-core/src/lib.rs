@@ -7,4 +7,5 @@
 
 pub mod diag;
 pub mod measure;
+pub mod schema;
 pub mod stats;

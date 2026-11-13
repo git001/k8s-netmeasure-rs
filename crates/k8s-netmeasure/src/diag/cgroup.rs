@@ -50,6 +50,12 @@ pub fn read() -> CgroupReport {
     }
 }
 
+/// A file of the own cgroup (`cpu.max`, `cpu.stat`); `None` without cgroup v2.
+pub fn own_file(name: &str) -> Option<String> {
+    let path = super::read("/proc/self/cgroup").and_then(|t| cgroup::parse_self_cgroup(&t))?;
+    super::read(&format!("{}/{name}", dir_of(&path)))
+}
+
 fn dir_of(path: &str) -> String {
     if path == "/" {
         ROOT.to_owned()

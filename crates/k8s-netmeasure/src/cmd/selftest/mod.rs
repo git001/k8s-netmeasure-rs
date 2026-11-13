@@ -15,7 +15,7 @@ use serde_json::json;
 
 use self::report::{Check, Status};
 use crate::build_info::BUILD_INFO;
-use crate::diag::{cgroup, node};
+use crate::diag::{cgroup, context};
 use crate::{exit, output};
 
 pub fn run(args: &SelftestArgs, sources: &BTreeMap<String, &'static str>) -> ExitCode {
@@ -31,7 +31,7 @@ pub fn run(args: &SelftestArgs, sources: &BTreeMap<String, &'static str>) -> Exi
     if let Some(path) = &args.output {
         let doc = json!({
             "schema": "k8s-netmeasure/selftest", "schema_version": 1,
-            "build_info": BUILD_INFO.to_json(), "node": node::read(),
+            "build_info": BUILD_INFO.to_json(), "node": context::read_context(&context::Declared::default()),
             "config_source": sources, "checks": checks,
         });
         let bytes = serde_json::to_vec_pretty(&doc).unwrap_or_default();

@@ -1,5 +1,6 @@
 //! `listen` (design §4, §7): the measurement target. Start order (§4.1): bind the
-//! measured port and start the accept thread, then bind the control port; only then
+//! measured port and start the accept thread, collect the initial node context, then
+//! bind the control port; only then
 //! do `/startup` and `/ready` report 200. On SIGTERM or SIGINT `/ready` turns 503 at
 //! once, the listener stops accepting and closes, the control server stops, and the
 //! process exits with `128 + signal`.
@@ -10,12 +11,12 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use netmeasure_cli::{ControlBind, ListenArgs};
-use serde_json::json;
+mod endpoints;
 
-use crate::build_info::BUILD_INFO;
+use netmeasure_cli::{ControlBind, ListenArgs};
+
 use crate::control::Server;
-use crate::control::state::{Heartbeat, State};
+use crate::control::state::State;
 use crate::diag::net;
 use crate::exit;
 use crate::listener::Listener;
@@ -24,10 +25,6 @@ use crate::sys::time;
 
 /// How often the main thread checks for a shutdown signal.
 const TICK: Duration = Duration::from_millis(100);
-/// Liveness bounds (§7): accept thread 5 s (it beats at least every second); the main
-/// thread of `listen` only waits for signals, so the same bound applies.
-const ACCEPT_BOUND_NS: u64 = 5_000_000_000;
-const MAIN_BOUND_NS: u64 = 5_000_000_000;
 
 pub fn run(args: &ListenArgs) -> ExitCode {
     if args.control_port == args.port {
@@ -56,9 +53,10 @@ pub fn run(args: &ListenArgs) -> ExitCode {
         }
     };
     let main_beat = Arc::new(AtomicU64::new(time::monotonic_ns()));
+    let context = endpoints::initial_context(args);
     let state = Arc::new(State::new(
-        info(args, &listener),
-        heartbeats(&listener, &main_beat),
+        endpoints::endpoints(args, &listener),
+        endpoints::heartbeats(&listener, &main_beat),
     ));
     let control_addr = SocketAddrV4::new(control_ip, args.control_port);
     let server = match Server::start(control_addr, Arc::clone(&state)) {
@@ -74,6 +72,9 @@ pub fn run(args: &ListenArgs) -> ExitCode {
         control = %server.local,
         backlog = args.backlog,
         effective_backlog = listener.effective_backlog,
+        node_name = context.node_name.value.as_deref(),
+        boot_id = context.boot_id.value.as_deref(),
+        nic = context.nic.value.is_some(),
         "listening"
     );
     let signal = loop {
@@ -103,33 +104,4 @@ fn control_ip(bind: ControlBind) -> Option<Ipv4Addr> {
         ControlBind::Addr(ip) => Some(ip),
         ControlBind::Auto => net::default_route_ipv4(),
     }
-}
-
-/// The `/v1/info` body (§7).
-fn info(args: &ListenArgs, listener: &Listener) -> serde_json::Value {
-    json!({
-        "schema": "k8s-netmeasure/control", "schema_version": 1,
-        "build_info": BUILD_INFO.to_json(),
-        "listener_instance": ulid::Ulid::generate().to_string(),
-        "measured": listener.local.to_string(),
-        "backlog": args.backlog,
-        "effective_backlog": listener.effective_backlog,
-    })
-}
-
-fn heartbeats(listener: &Listener, main_beat: &Arc<AtomicU64>) -> Vec<Heartbeat> {
-    let counters = listener.counters();
-    let main = Arc::clone(main_beat);
-    vec![
-        Heartbeat {
-            name: "accept",
-            read: Box::new(move || counters.heartbeat_ns.load(Ordering::Relaxed)),
-            bound_ns: ACCEPT_BOUND_NS,
-        },
-        Heartbeat {
-            name: "main",
-            read: Box::new(move || main.load(Ordering::Relaxed)),
-            bound_ns: MAIN_BOUND_NS,
-        },
-    ]
 }

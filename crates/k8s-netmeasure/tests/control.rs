@@ -36,3 +36,38 @@ fn unknown_path_method_and_query_are_rejected() {
     assert_eq!(get(&l.control, "/v1/info?verbose=1").unwrap().0, 400);
     stop_with(l.child, Signal::SIGTERM);
 }
+
+#[test]
+fn context_and_snapshot_parse_strictly() {
+    use netmeasure_core::schema::control::{NodeContext, Snapshot};
+    use netmeasure_core::schema::sourced::Source;
+
+    let l = common::listen::start_with(&["--node-name", "node-a", "--zone", "z1"]);
+    let (code, body) = get(&l.control, "/v1/context").unwrap();
+    assert_eq!(code, 200);
+    let ctx: NodeContext = serde_json::from_value(body).expect("context matches the schema");
+    assert_eq!(ctx.node_name.value.as_deref(), Some("node-a"));
+    assert_eq!(ctx.node_name.source, Source::Declared);
+    assert_eq!(ctx.instance_type.source, Source::Unknown);
+    assert_eq!(ctx.kernel_release.source, Source::Observed);
+
+    std::net::TcpStream::connect(&l.addr).unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let snap = loop {
+        let (code, body) = get(&l.control, "/v1/snapshot").unwrap();
+        assert_eq!(code, 200);
+        let snap: Snapshot = serde_json::from_value(body).expect("snapshot matches the schema");
+        if snap.listener.accepted >= 1 || std::time::Instant::now() > deadline {
+            break snap;
+        }
+    };
+    assert!(snap.listener.accepted >= 1);
+    assert_eq!(snap.listener.sk_drops, Some(0));
+    assert_eq!(snap.boot_id, ctx.boot_id.value);
+    let (_, info) = get(&l.control, "/v1/info").unwrap();
+    assert_eq!(
+        info["listener_instance"].as_str(),
+        Some(snap.listener_instance.as_str())
+    );
+    stop_with(l.child, Signal::SIGTERM);
+}

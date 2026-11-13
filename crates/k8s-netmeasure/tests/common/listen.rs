@@ -20,20 +20,28 @@ pub struct Running {
 /// Starts `listen` on free loopback ports and waits until the control port reports
 /// ready.
 pub fn start() -> Running {
+    start_with(&[])
+}
+
+/// Like [`start`], with extra arguments.
+pub fn start_with(extra: &[&str]) -> Running {
     let addr = super::closed_port();
     let control = super::closed_port();
     let port = |a: &str| a.rsplit(':').next().unwrap().to_owned();
-    let child = super::spawn(&[
+    let (p, c) = (port(&addr), port(&control));
+    let mut args = vec![
         "listen",
         "--bind",
         "127.0.0.1",
         "--port",
-        &port(&addr),
+        &p,
         "--control-bind",
         "127.0.0.1",
         "--control-port",
-        &port(&control),
-    ]);
+        &c,
+    ];
+    args.extend_from_slice(extra);
+    let child = super::spawn(&args);
     let deadline = Instant::now() + Duration::from_secs(10);
     while get(&control, "/ready").map(|(code, _)| code) != Some(200) {
         assert!(Instant::now() < deadline, "listen did not become ready");

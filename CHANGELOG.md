@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `listen` control port: `GET /v1/context` (node context with provenance per field:
+  `observed`, `declared`, `unknown`; kernel, boot id, uptime, CPU model and
+  microcode, own `cpu.max`, TCP sysctls, MTU, NIC path) and `GET /v1/snapshot`
+  (monotonic time, boot id, `listener_instance`, accept counters, listener
+  `SK_MEMINFO_DROPS`, netns `ListenOverflows`/`ListenDrops`, own `cpu.stat`, NIC
+  path). The bodies are typed in `netmeasure-core::schema::control` and read back
+  with `deny_unknown_fields`. New declared-context flags `--node-name` (default
+  `$NODE_NAME`), `--zone`, `--instance-type`.
 - `listen` control port (HTTP/1.1 + JSON on its own thread, tokio `current_thread` +
   hyper): `GET /startup`, `/live` (watchdog over the accept and main threads, 5 s),
   `/ready` (503 from the first shutdown signal on) and `/v1/info` (build info,
@@ -50,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`anomaly_states`).
 - Node facts include the CPU model and microcode revision of the first processor
   (`/proc/cpuinfo`); `selftest --output` includes them.
+- `selftest --output`: `node` is now the node context of `/v1/context` (every field
+  with `value` and `source`).
 - `--log-level` (`K8S_NETMEASURE_LOG_LEVEL`) on every subcommand: `error`, `warn`,
   `info` (default), `debug`, `trace`; `debug` logs parameter sources and full
   `selftest` check data.
