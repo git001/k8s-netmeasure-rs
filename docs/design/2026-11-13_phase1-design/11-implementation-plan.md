@@ -24,7 +24,11 @@ milestone ends with something that runs and is reviewed before the next one star
 
    These findings may change §3.3, §3.7 or §4.2 before anything builds on them.
 3. **`listen` + `run` + result file.** Listener, control port, cycles, validity,
-   shutdown behaviour and its tests, atomic writing, the schema.
+   shutdown behaviour and its tests, atomic writing, the schema. Split into five
+   reviewable steps: 3a `listen` with the measured port (accept thread, signals);
+   3b control port and node context; 3c `run` with own snapshots, validity and the
+   result file; 3d `run` against targets' control ports and `--node-context-from`;
+   3e shutdown deadline, example manifests, README.
 4. **Statistics with the simulation suite.** Quantiles, order-statistic CI, block
    bootstrap, verdicts. The §11 acceptance criteria must pass **before** step 5
    produces any verdict.

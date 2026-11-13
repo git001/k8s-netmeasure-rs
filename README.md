@@ -2,9 +2,9 @@
 
 Reproducible TCP connect-latency measurement in Kubernetes and OpenShift.
 
-**Status: milestone 2 of the [Phase 1 implementation plan](docs/design/2026-11-13_phase1-design/11-implementation-plan.md)
-(measurement core, `probe`, `selftest`).** `listen`, `run` and `report` follow in the
-next milestones. The design is in
+**Status: milestone 3 of the [Phase 1 implementation plan](docs/design/2026-11-13_phase1-design/11-implementation-plan.md)
+in progress:** `probe`, `selftest` and `listen` (measured port only; the control port
+follows). `run` and `report` follow. The design is in
 [docs/design/2026-11-13_phase1-design/](docs/design/2026-11-13_phase1-design/README.md).
 
 ## Subcommands so far
@@ -12,6 +12,9 @@ next milestones. The design is in
 ```sh
 # Is this kernel suitable? Run once per node type before measuring (about 10 s).
 k8s-netmeasure selftest [--output selftest.json]
+
+# Measurement target: accepts on the measured port until SIGTERM/SIGINT (exit 143/130).
+k8s-netmeasure listen [--port 17700] [--bind 0.0.0.0] [--backlog 4096]
 
 # Manual cross-check of one path, same code path as the measurement (not a measurement).
 k8s-netmeasure probe --target 10.0.0.5:17700 [--count 5] [--timeout 5s]
@@ -25,6 +28,13 @@ Logs are JSON lines on stderr; results go to stdout. Every subcommand takes
 `--log-level error|warn|info|debug|trace` (`K8S_NETMEASURE_LOG_LEVEL`, default `info`);
 `debug` adds details such as the source of every parameter and the full data of each
 `selftest` check.
+
+`listen` accepts connections and never reads or writes on them. It keeps the last 64
+accepted connections open instead of closing each at once, so its FIN cannot reach the
+client before the client has checked the connection. The effective backlog is
+`min(--backlog, net.core.somaxconn)` and is logged at start. A port that cannot be bound
+ends the process with exit 3. On shutdown it logs the accepted, aborted and failed
+accepts and the listener's SYN drops (`SK_MEMINFO_DROPS`).
 
 `probe` measures TCP connection establishment only: one JSON line per connect with
 the duration, the outcome, the errno, the SYN retransmissions and `peer_closed` (the

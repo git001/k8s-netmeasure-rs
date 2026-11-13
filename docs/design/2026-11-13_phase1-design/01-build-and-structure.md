@@ -68,7 +68,6 @@ project containing every crate below. Results:
 - `rand` 0.10 is shared by `rand_chacha`, `ulid` and `statrs`.
 - `statrs` without default features still provides `Binomial`/`Beta`/`Normal` CDFs and
   quantiles; spot check: `Normal::inverse_cdf(0.975) = 1.959964`.
-- `signal-hook` 0.4.6 still has `flag::register_conditional_shutdown`.
 
 | Crate | Version | Features | Use | Note |
 |---|---|---|---|---|
@@ -81,7 +80,6 @@ project containing every crate below. Results:
 | `hyper` / `hyper-util` / `http-body-util` | 1.12.0 / 0.1.21 / 0.1.5 | `server`, `client`, `http1` | HTTP/1.1 control-port server and client | `/metrics` joins in Phase 3 |
 | `tracing` | 0.1.44 | `default-features = false`, `std` | logging facade | without defaults: no `tracing-attributes`, which would pull in a second `syn` major version |
 | `tracing-subscriber` | 0.3.23 | `json` | JSON lines, `flatten_event(true)`, `with_span_list(false)` | |
-| `signal-hook` | 0.4.6 | — | SIGTERM/SIGINT → `AtomicBool`; second signal → immediate exit | no extra thread |
 | `ulid` | 3.0.0 | — | `run_id`, `cycle_id`, `listener_instance` | |
 | `rand` / `rand_chacha` | 0.10.3 / 0.10.0 | — | seeded bootstrap RNG (seed in report) | core only |
 | `statrs` | 0.19.1 | `default-features = false` | binomial, beta, normal quantiles | without defaults: no `nalgebra` (about 30 crates fewer) |

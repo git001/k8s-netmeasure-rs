@@ -10,6 +10,7 @@
 #![deny(clippy::too_many_arguments)]
 
 pub mod env;
+pub mod listen;
 pub mod log;
 pub mod parse;
 pub mod probe;
@@ -18,6 +19,7 @@ pub mod surface;
 
 use clap::{Command, CommandFactory, Parser, Subcommand};
 
+pub use crate::listen::ListenArgs;
 pub use crate::log::{LogArgs, LogLevel};
 pub use crate::probe::ProbeArgs;
 pub use crate::selftest::SelftestArgs;
@@ -43,6 +45,9 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Subcommands {
+    /// Measurement target: accepts TCP connections on the measured port and never
+    /// reads or writes on them. Runs until SIGTERM or SIGINT.
+    Listen(ListenArgs),
     /// Manual cross-check: a few connects with the measurement code path, one JSON
     /// line each. Not a measurement: no pacing, cycles or self-validation.
     Probe(ProbeArgs),
@@ -56,6 +61,7 @@ impl Subcommands {
     /// The logging arguments every subcommand carries.
     pub fn log(&self) -> &LogArgs {
         match self {
+            Subcommands::Listen(a) => &a.log,
             Subcommands::Probe(a) => &a.log,
             Subcommands::Selftest(a) => &a.log,
         }

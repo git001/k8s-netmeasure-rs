@@ -1,7 +1,7 @@
 //! `k8s-netmeasure`: reproducible TCP connect-latency measurement (design README).
 //!
-//! Subcommands so far: `probe` and `selftest` (milestone 2, design §14); `listen`,
-//! `run` and `report` follow in the next milestones.
+//! Subcommands so far: `probe` and `selftest` (milestone 2, design §14) and `listen`
+//! (milestone 3, measured port only); `run` and `report` follow.
 #![deny(unsafe_code)]
 #![forbid(clippy::too_many_arguments)]
 
@@ -9,9 +9,11 @@ mod build_info;
 mod cmd;
 mod diag;
 mod exit;
+mod listener;
 mod logging;
 mod measure;
 mod output;
+mod shutdown;
 mod sys;
 
 use std::process::ExitCode;
@@ -46,6 +48,7 @@ fn main() -> ExitCode {
         tracing::debug!(parameter = %param, source = %source, "parameter source");
     }
     match &cli.command {
+        Subcommands::Listen(args) => cmd::listen::run(args),
         Subcommands::Probe(args) => cmd::probe::run(args),
         Subcommands::Selftest(args) => cmd::selftest::run(args, &env.sources),
     }

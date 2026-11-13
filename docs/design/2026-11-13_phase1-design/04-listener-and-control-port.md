@@ -142,7 +142,7 @@ port, one protocol**. That matches the prompt's "`/ready` next to `/metrics`".
 - In `run`, the main thread additionally holds its own `current_thread` runtime for the
   hyper client and calls it via `block_on`, between cycles only.
 - The measuring, accept and load threads never touch tokio. Signals stay with
-  `signal-hook` flags, not `tokio::signal`, so shutdown behaves identically in every
+  with the `sigwait` thread of §8, not `tokio::signal`, so shutdown behaves identically in every
   thread.
 - Reason for tokio already in Phase 1: Phase 2's `kube` client is async and Phase 3's
   `/metrics` needs this same server. Introducing the runtime now, confined to one

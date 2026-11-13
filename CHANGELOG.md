@@ -29,6 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `listen` subcommand, measured port only (control port follows): `--port` (default
+  17700), `--bind` (default `0.0.0.0`), `--backlog` (default 4096, effective
+  `min(backlog, somaxconn)`, logged). A dedicated accept thread keeps the last 64
+  connections open. SIGTERM / SIGINT stop it with exit 143 / 130, a second signal
+  exits at once; a port that cannot be bound is exit 3. On shutdown it logs accepted,
+  aborted and failed accepts and the listener's `SK_MEMINFO_DROPS`.
 - Node facts list every physical interface with its driver and RX/TX ring sizes
   (current and maximum, `ethtool -g` equivalent, no capability needed); a size the
   driver does not report is `null`. `selftest --output` includes them.

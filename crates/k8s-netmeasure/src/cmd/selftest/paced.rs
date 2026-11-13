@@ -4,6 +4,7 @@
 //! never interrupt the measuring thread).
 
 use std::collections::BTreeMap;
+use std::net::{Ipv4Addr, SocketAddrV4};
 use std::time::Duration;
 
 use netmeasure_core::measure::outcome::{Outcome, peer_closed, tcp_state_name};
@@ -11,8 +12,8 @@ use netmeasure_core::measure::pacing::{Next, Pacer};
 use netmeasure_core::stats::quantile::type1;
 use serde_json::json;
 
-use super::lo::Draining;
 use super::report::{Check, Status};
+use crate::listener::Listener;
 use crate::measure::connect;
 use crate::measure::thread::{self, ThreadSetup};
 use crate::sys::{sigaction, signals, time};
@@ -21,6 +22,7 @@ pub const SLOTS: u32 = 1000;
 pub const INTERVAL_NS: u64 = 10_000_000;
 const TIMEOUT_NS: u64 = 1_000_000_000;
 const SIGNAL_AFTER: Duration = Duration::from_secs(5);
+const LISTEN_BACKLOG: u32 = 128;
 
 /// Raw observations of the paced loop.
 pub struct Observed {
@@ -53,8 +55,8 @@ pub fn run() -> Vec<Check> {
 }
 
 fn measure() -> std::io::Result<Observed> {
-    let listener = Draining::start()?;
-    let addr = listener.addr;
+    let listener = Listener::start(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0), LISTEN_BACKLOG)?;
+    let addr = listener.local;
     sigaction::install_usr2_counter().map_err(std::io::Error::from_raw_os_error)?;
     let raiser = std::thread::spawn(|| {
         std::thread::sleep(SIGNAL_AFTER);

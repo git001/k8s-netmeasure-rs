@@ -1,6 +1,7 @@
-//! Signal mask of the measuring thread (design §3.1): every asynchronous signal is
-//! blocked, so the kernel delivers SIGTERM/SIGINT/… to another thread and the timed
-//! section sees no `EINTR`. Synchronous fault signals stay unblocked.
+//! Signal masks (design §3.1, §8). The measuring thread blocks every asynchronous
+//! signal, so the timed section sees no `EINTR`; synchronous fault signals stay
+//! unblocked. SIGTERM and SIGINT are blocked process-wide and taken with `sigwait` by
+//! one thread (`crate::shutdown`), so no signal handler is needed for them.
 
 use nix::sys::signal::{SigSet, Signal};
 
@@ -21,6 +22,23 @@ pub fn block_async_signals() -> Result<(), i32> {
         set.remove(sig);
     }
     set.thread_block().map_err(|e| e as i32)
+}
+
+/// SIGTERM and SIGINT.
+pub fn termination() -> SigSet {
+    let mut set = SigSet::from(Signal::SIGTERM);
+    set.add(Signal::SIGINT);
+    set
+}
+
+/// Blocks `set` for the calling thread; threads it starts afterwards inherit the mask.
+pub fn block(set: &SigSet) -> Result<(), i32> {
+    set.thread_block().map_err(|e| e as i32)
+}
+
+/// Waits for one signal of `set`, which must be blocked (`sigwait`).
+pub fn wait(set: &SigSet) -> Result<Signal, i32> {
+    set.wait().map_err(|e| e as i32)
 }
 
 /// Unblocks `signal` for the calling thread (tests: the EINTR case of §11).

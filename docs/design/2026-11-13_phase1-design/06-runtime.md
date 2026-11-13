@@ -40,7 +40,12 @@ second. The README describes how to size `--backlog` and `--load-rate` together.
   Worst case from signal to exit ≈ deadline + timeout + file write ≈ 16 s, below the
   default 30 s grace period. Phase 2 chart rule: `terminationGracePeriodSeconds ≥
   shutdown_deadline + timeout + 10 s`.
-- A second signal exits immediately via `signal-hook`'s conditional shutdown. Because of
+- **Signal handling without a handler** (decided in milestone 3a, replacing
+  `signal-hook`): SIGTERM and SIGINT are blocked in the main thread before any other
+  thread starts, so every thread inherits the mask; one `signals` thread takes them
+  with `sigwait` (`nix` `SigSet::wait`, no `unsafe`, no extra crate) and sets a flag
+  every thread reads.
+- A second signal exits immediately (the `signals` thread calls `exit(128 + signal)`). Because of
   the atomic write there is then either no new file or a complete one.
 - `listen`: `/ready` switches to `503` at once; stop accepting, close the measured
   listening socket, stop the control server, exit.
