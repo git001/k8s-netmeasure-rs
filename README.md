@@ -38,7 +38,7 @@ Toolchain: pinned by `rust-toolchain.toml` (Rust 1.100, edition 2024).
 cargo build --release
 cargo xtask ci        # every quality gate, exactly as CI runs them
 cargo xtask <gate>    # one gate: fmt | clippy | line-limit | test | deny | audit | coverage
-cargo xtask musl      # static musl build + tests (needs musl-gcc, cargo-auditable)
+cargo xtask musl      # static musl build + tests (needs cargo-auditable)
 cargo xtask changelog <version>   # release notes from CHANGELOG.md
 ```
 

@@ -24,9 +24,6 @@ use crate::build_info::BUILD_INFO;
 
 static VERSION_LINE: LazyLock<String> = LazyLock::new(|| BUILD_INFO.version_line());
 
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 fn main() -> ExitCode {
     // `--help`/`--version` exit 0; usage errors exit 2 (design §8).
     let command = netmeasure_cli::command(VERSION_LINE.as_str());

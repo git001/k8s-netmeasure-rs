@@ -30,7 +30,6 @@ netmeasure-util = { path = "crates/netmeasure-util" }
 netmeasure-core = { path = "crates/netmeasure-core" }
 netmeasure-cli = { path = "crates/netmeasure-cli" }
 clap = { version = "4.6.7", features = ["derive", "env"] }
-mimalloc = "0.1.52"
 libc = "0.2.191"
 nix = { version = "0.31.3", default-features = false, features = ["signal", "poll", "time", "process", "pthread"] }
 socket2 = { version = "0.6.5", features = ["all"] }

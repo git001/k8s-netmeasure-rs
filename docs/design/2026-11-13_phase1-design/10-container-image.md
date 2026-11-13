@@ -11,9 +11,8 @@ deliverable**, not Phase 2. Phase 2 adds only the chart around it.
 
 `Containerfile`, multi-stage:
 
-1. **Builder:** `registry.access.redhat.com/ubi10/ubi`, with `gcc` (for
-   `libmimalloc-sys`; why mimalloc at all, and why it does not touch the measurement:
-   §2), `rustup` installed with checksum verification, the toolchain
+1. **Builder:** `registry.access.redhat.com/ubi10/ubi`, with `gcc` (as the linker;
+   no C code is compiled), `rustup` installed with checksum verification, the toolchain
    pinned by `rust-toolchain.toml`. It runs `cargo build --release --locked`. Building
    in the image guarantees the glibc baseline of §1 (2.39).
 2. **Runtime:** `registry.access.redhat.com/ubi10/ubi-minimal`, both base images pinned

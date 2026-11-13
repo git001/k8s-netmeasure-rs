@@ -13,7 +13,7 @@ FROM ${BUILDER_IMAGE} AS builder
 ARG RUSTUP_VERSION=1.29.3
 ARG RUSTUP_SHA256=b1c8cb14e30889e7e2999e6b69e62d9e9b9ffc0f4df8180564d306d9680e6c55
 
-# gcc: C part of mimalloc (libmimalloc-sys).
+# gcc: linker for the gnu target (no C code is compiled).
 RUN dnf -y install --setopt=install_weak_deps=False --nodocs gcc \
  && dnf clean all
 

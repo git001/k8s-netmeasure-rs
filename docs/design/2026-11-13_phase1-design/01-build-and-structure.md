@@ -24,7 +24,8 @@ Consequences:
   as a distribution format and not in the image. It exists for one situation: the
   image cannot be pulled or mirrored in time, and the only way to measure is `oc cp`
   into an already running pod of any base image. It is built on the CI runner with
-  `musl-tools` (mimalloc's C part needs `musl-gcc`) and runs the same test suite.
+  the Rust musl target alone (no C dependency, so no `musl-gcc`) and runs the same
+  test suite.
   Its `build_info` says `static: true`, so result files show which build produced
   them.
 - **[deviation]** The prompt's Phase 1 path "copy a static binary with `oc cp` into any
@@ -87,7 +88,6 @@ project containing every crate below. Results:
 | `glob` | 0.3.4 | — | `report --before 'results/x/*.json'` | |
 | `jiff` | 0.2.43 | `default-features = false`, `std`, `serde` | UTC `Timestamp` (ns, RFC 3339), `SignedDuration`, CLI durations | only via `netmeasure-util::time`; no tz database; never in the timed section |
 | `thiserror` / `anyhow` | 2.0.21 / 1.0.104 | — | errors (core / binary) | |
-| `mimalloc` | 0.1.52 | — | `#[global_allocator]`, binary only | C build: builder needs `gcc` |
 | dev: `tempfile` / `assert_cmd` | 3.27.0 / 2.2.2 | — | integration and shutdown tests | |
 | xtask: `syn` / `proc-macro2` | 3.0.10 / 1.0.107 | `full` / `span-locations` | line-limit check (§12) | not shipped |
 
@@ -191,7 +191,7 @@ crates/netmeasure-core/src/
     render_json.rs
 
 crates/k8s-netmeasure/src/
-  main.rs, cli.rs, exit.rs     (main.rs sets the mimalloc #[global_allocator])
+  main.rs, cli.rs, exit.rs
   sys/               the only unsafe module: thin wrappers over syscalls (nix, libc)
   shutdown.rs        signal flags
   logging.rs         tracing setup, field names (§9)
@@ -219,9 +219,10 @@ crates/netmeasure-cli/src/
 xtask/src/           cargo xtask fmt | clippy | line-limit | test | deny | audit | coverage | ci | musl (§12)
 ```
 
-The allocator does not change the measurement: the measuring thread does not allocate
-in the timed section or between samples (preallocated buffers). mimalloc mainly helps
-`report`, where the bootstrap allocates heavily, and the load threads.
+The binary uses the system allocator (mimalloc was dropped after milestone 2: no
+measurable benefit here, and its C part was the only C dependency, which blocked a
+plain musl build). The measuring thread does not allocate in the timed section or
+between samples (preallocated buffers).
 
 Threads in `run`: **main** (orchestration, snapshots, control-port client, file
 writing, shutdown flag), **measuring** (one, dedicated), **accept** (own listener,

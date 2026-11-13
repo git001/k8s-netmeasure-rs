@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The binary uses the system allocator; mimalloc is removed. It brought no measurable
+  benefit here and was the only C dependency, so the static musl build now needs no
+  `musl-gcc` (CI no longer installs `musl-tools`).
 - Design: the per-cycle NIC path check also compares RX/TX ring sizes; a change
   invalidates the cycle as `nic_changed`.
 - Design: the NIC family is treated as a property of the host, not of the instance

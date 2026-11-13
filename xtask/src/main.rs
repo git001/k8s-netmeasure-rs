@@ -25,7 +25,7 @@ gates:
   coverage     cargo llvm-cov with per-crate line thresholds
   ci           all of the above, in this order
   musl         static musl build (with cargo-auditable) and test suite (emergency
-               artifact, design §1); needs musl-gcc (musl-tools) and
+               artifact, design §1); adds the musl target, needs
                cargo-auditable, not part of `ci`
 
 tools:
