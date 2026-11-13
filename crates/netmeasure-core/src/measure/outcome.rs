@@ -5,6 +5,9 @@ use serde::Serialize;
 
 /// Linux `TCP_ESTABLISHED` (`include/net/tcp_states.h`).
 pub const TCP_ESTABLISHED: u8 = 1;
+/// Linux `TCP_CLOSE_WAIT`: the peer's FIN arrived. Reachable only from
+/// `ESTABLISHED`, so the handshake is proven complete.
+pub const TCP_CLOSE_WAIT: u8 = 8;
 
 /// How `connect()` returned and how the wait for completion ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,7 +73,14 @@ pub fn errno(facts: &Facts) -> Option<i32> {
     }
 }
 
-/// Decides the outcome. `ok` requires `SO_ERROR == 0` **and** `ESTABLISHED`.
+/// The peer closed before `TCP_INFO` was read (`CLOSE_WAIT`): still `ok`, counted
+/// separately as `peer_closed` (design §3.1).
+pub fn peer_closed(state: Option<u8>) -> bool {
+    state == Some(TCP_CLOSE_WAIT)
+}
+
+/// Decides the outcome. `ok` requires `SO_ERROR == 0` **and** `ESTABLISHED` or
+/// `CLOSE_WAIT` (both prove the completed handshake).
 pub fn classify(facts: &Facts) -> Outcome {
     match facts.completion {
         Completion::LocalFailure(_) => Outcome::LocalError,
@@ -78,10 +88,35 @@ pub fn classify(facts: &Facts) -> Outcome {
         Completion::ConnectFailed(e) => errno_class(e),
         Completion::Immediate | Completion::Event => match facts.so_error {
             None => Outcome::LocalError,
-            Some(0) if facts.tcp_state == Some(TCP_ESTABLISHED) => Outcome::Ok,
+            Some(0) if matches!(facts.tcp_state, Some(TCP_ESTABLISHED | TCP_CLOSE_WAIT)) => {
+                Outcome::Ok
+            }
             Some(0) => Outcome::Anomaly,
             Some(e) => errno_class(e),
         },
+    }
+}
+
+/// Name of a Linux `tcpi_state` (`include/net/tcp_states.h`), for logs and reports.
+pub fn tcp_state_name(state: Option<u8>) -> &'static str {
+    const NAMES: [&str; 13] = [
+        "invalid",
+        "established",
+        "syn_sent",
+        "syn_recv",
+        "fin_wait1",
+        "fin_wait2",
+        "time_wait",
+        "close",
+        "close_wait",
+        "last_ack",
+        "listen",
+        "closing",
+        "new_syn_recv",
+    ];
+    match state {
+        None => "unknown",
+        Some(s) => NAMES.get(usize::from(s)).copied().unwrap_or("invalid"),
     }
 }
 
@@ -109,18 +144,19 @@ mod tests {
     }
 
     #[test]
-    fn ok_needs_so_error_zero_and_established() {
+    fn ok_needs_so_error_zero_and_established_or_close_wait() {
         for c in [Completion::Immediate, Completion::Event] {
-            assert_eq!(
-                classify(&facts(c, Some(0), Some(TCP_ESTABLISHED))),
-                Outcome::Ok
-            );
+            for state in [TCP_ESTABLISHED, TCP_CLOSE_WAIT] {
+                assert_eq!(classify(&facts(c, Some(0), Some(state))), Outcome::Ok);
+            }
         }
+        assert!(peer_closed(Some(TCP_CLOSE_WAIT)));
+        assert!(!peer_closed(Some(TCP_ESTABLISHED)) && !peer_closed(None));
     }
 
     #[test]
     fn so_error_zero_in_any_other_state_is_an_anomaly_never_ok() {
-        for state in (0u8..=12).filter(|&s| s != TCP_ESTABLISHED) {
+        for state in (0u8..=12).filter(|&s| s != TCP_ESTABLISHED && s != TCP_CLOSE_WAIT) {
             assert_eq!(
                 classify(&facts(Completion::Event, Some(0), Some(state))),
                 Outcome::Anomaly
@@ -130,6 +166,14 @@ mod tests {
             classify(&facts(Completion::Event, Some(0), None)),
             Outcome::Anomaly
         );
+    }
+
+    #[test]
+    fn state_names() {
+        assert_eq!(tcp_state_name(Some(TCP_ESTABLISHED)), "established");
+        assert_eq!(tcp_state_name(Some(8)), "close_wait");
+        assert_eq!(tcp_state_name(Some(13)), "invalid");
+        assert_eq!(tcp_state_name(None), "unknown");
     }
 
     #[test]

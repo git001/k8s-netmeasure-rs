@@ -10,7 +10,7 @@ Part of the [Phase 1 design](README.md) · covers §4, §7 · previous: [Validit
 
 | Port | Flag (env) | Protocol | Purpose |
 |---|---|---|---|
-| **Measured port** | `--port` / `--bind` (`K8S_NETMEASURE_PORT`, `K8S_NETMEASURE_BIND`) | raw TCP: accept and close, nothing is ever read or written | the only port whose handshakes are measured |
+| **Measured port** | `--port` / `--bind` (`K8S_NETMEASURE_PORT`, `K8S_NETMEASURE_BIND`) | raw TCP: accept, close 64 connections later (§4.2), nothing is ever read or written | the only port whose handshakes are measured |
 | **Control port** | `--control-port` / `--control-bind` (`K8S_NETMEASURE_CONTROL_PORT`, `K8S_NETMEASURE_CONTROL_BIND`) | HTTP/1.1 + JSON (§7) | probes, `/v1/*`, `/metrics` (Phase 3) |
 
 The two ports must differ, and the same `bind:port` used twice is a configuration error
@@ -63,7 +63,11 @@ the process refuses to start (exit 3).
   (default 4096); the effective backlog `min(backlog, somaxconn)` is recorded.
 - Dedicated accept thread: `poll` on the listening socket with a 1 s timeout, so it can
   update its liveness heartbeat (§7) while idle; then `accept4(SOCK_CLOEXEC)`
-  until `EAGAIN`, each followed by an immediate `close()`.
+  until `EAGAIN`. An accepted connection is **not** closed at once but kept in a ring
+  of the last 64 and closed when it drops out (decided after the first cluster
+  `selftest`): an immediate close sends a FIN that can reach the client before it
+  reads `TCP_INFO` (`CLOSE_WAIT`, §3.1). The client resets the connection right after
+  the sample (`SO_LINGER=0`), so a held connection costs one fd and no traffic.
   `ECONNABORTED` is expected, because the client may RST before accept, and is counted
   but not treated as an error. Counters: accepted, aborted.
 - Never set `TCP_DEFER_ACCEPT` or `TCP_FASTOPEN`: both change what the handshake looks

@@ -55,10 +55,20 @@ t1 = Instant::now()
 Then outside: `getsockopt(SO_ERROR)` → outcome (0 → candidate `ok`, else the errno
 class of §3.2); `getsockopt(TCP_INFO)` → SYN retransmissions **and `tcpi_state`**;
 `close()` (RST, no TIME_WAIT). **Plausibility check (review round 2):** a sample is
-`ok` only if `SO_ERROR == 0` **and** `tcpi_state == TCP_ESTABLISHED`. `SO_ERROR == 0`
-in any other state, e.g. still `SYN_SENT` after an unexpected wake-up, is an
-`anomaly` (§3.2) and never counted as `ok`. The check costs nothing, because
-`TCP_INFO` is read anyway.
+`ok` only if `SO_ERROR == 0` **and** `tcpi_state` is `TCP_ESTABLISHED` or
+`TCP_CLOSE_WAIT`. `SO_ERROR == 0` in any other state, e.g. still `SYN_SENT` after an
+unexpected wake-up, is an `anomaly` (§3.2) and never counted as `ok`. The check costs
+nothing, because `TCP_INFO` is read anyway.
+
+**`CLOSE_WAIT` (decided after the first cluster `selftest`).** A listener that accepts
+and closes at once sends its FIN right after the handshake. If the measuring thread is
+preempted between the end of `ppoll` and `getsockopt(TCP_INFO)`, the FIN is already
+there and the socket is in `CLOSE_WAIT`. Seen in a pod with a 1-CPU quota (1 in 1000
+loopback connects) and reproduced with the thread pinned to a busy CPU (40–317 in
+1000, all `CLOSE_WAIT`). `CLOSE_WAIT` is reachable only from `ESTABLISHED`, so the
+handshake is proven complete and the sample is `ok`; it is counted as `peer_closed`
+(sample flag, `probe` field, `selftest` detail), so a target that closes early stays
+visible. Our own listeners avoid it in the first place (§4.2).
 An immediate `connect` error other than `EINPROGRESS` (e.g. `ENETUNREACH`) ends the
 timed section at once and is classified directly.
 
@@ -104,7 +114,7 @@ this stays cheap, but the README will name it.
 
 | Outcome | Condition | In latency distribution? |
 |---|---|---|
-| `ok` | `SO_ERROR == 0` and `tcpi_state == ESTABLISHED` | yes |
+| `ok` | `SO_ERROR == 0` and `tcpi_state` is `ESTABLISHED` or `CLOSE_WAIT` (§3.1) | yes |
 | `anomaly` | `SO_ERROR == 0` but any other `tcpi_state` | no; counted and logged at WARN, counts towards `sample_count_short` like a local error. Expected never to occur; `selftest` measures its rate before the first `run` (§3.8) and step 2 checks it on both NIC families (§16); the README tells the operator to report it |
 | `timeout` | `ppoll` timed out | yes, censored at ≥ timeout |
 | `refused` | `ECONNREFUSED` | no; counted, evaluated as failure |

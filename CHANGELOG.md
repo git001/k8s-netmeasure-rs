@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A connect whose socket is already in `CLOSE_WAIT` when `TCP_INFO` is read (the
+  target accepted and closed before the check) is `ok`, no longer `anomaly`: that
+  state is reachable only after a completed handshake. It is counted as
+  `peer_closed` (`probe` field, `selftest` detail). Seen as 1 anomaly in 1000 in a
+  pod with a 1-CPU quota.
+- The `selftest` loopback listener keeps the last 64 accepted connections open
+  instead of closing each at once, so its FIN cannot reach the client before the
+  check; `listen` will do the same (design §4.2).
 - The binary uses the system allocator; mimalloc is removed. It brought no measurable
   benefit here and was the only C dependency, so the static musl build now needs no
   `musl-gcc` (CI no longer installs `musl-tools`).
@@ -24,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Node facts list every physical interface with its driver and RX/TX ring sizes
   (current and maximum, `ethtool -g` equivalent, no capability needed); a size the
   driver does not report is `null`. `selftest --output` includes them.
+- `selftest`: the loopback check lists the TCP state of every `anomaly`
+  (`anomaly_states`).
 - Node facts include the CPU model and microcode revision of the first processor
   (`/proc/cpuinfo`); `selftest --output` includes them.
 - `--log-level` (`K8S_NETMEASURE_LOG_LEVEL`) on every subcommand: `error`, `warn`,

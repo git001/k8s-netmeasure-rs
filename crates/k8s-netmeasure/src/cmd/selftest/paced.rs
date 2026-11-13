@@ -3,9 +3,10 @@
 //! timer slack 1 ns, and signal isolation (SIGUSR2 sent to the process mid-loop must
 //! never interrupt the measuring thread).
 
+use std::collections::BTreeMap;
 use std::time::Duration;
 
-use netmeasure_core::measure::outcome::Outcome;
+use netmeasure_core::measure::outcome::{Outcome, peer_closed, tcp_state_name};
 use netmeasure_core::measure::pacing::{Next, Pacer};
 use netmeasure_core::stats::quantile::type1;
 use serde_json::json;
@@ -30,6 +31,10 @@ pub struct Observed {
     pub overruns: u32,
     pub sync: u32,
     pub anomalies: u32,
+    /// `ok`, but the peer had already closed (`CLOSE_WAIT`, §3.1).
+    pub peer_closed: u32,
+    /// `tcpi_state` of each anomaly, by name.
+    pub anomaly_states: BTreeMap<&'static str, u32>,
     pub not_ok: u32,
     pub eintr: u32,
     pub usr2_delivered: u32,
@@ -64,6 +69,8 @@ fn measure() -> std::io::Result<Observed> {
             overruns: 0,
             sync: 0,
             anomalies: 0,
+            peer_closed: 0,
+            anomaly_states: BTreeMap::new(),
             not_ok: 0,
             eintr: 0,
             usr2_delivered: 0,
@@ -78,8 +85,14 @@ fn measure() -> std::io::Result<Observed> {
             let a = connect::attempt(addr, TIMEOUT_NS);
             o.durations_ns.push(a.duration_ns);
             o.sync += u32::from(a.sync_connect);
-            o.anomalies += u32::from(a.outcome == Outcome::Anomaly);
+            if a.outcome == Outcome::Anomaly {
+                o.anomalies += 1;
+                *o.anomaly_states
+                    .entry(tcp_state_name(a.tcp_info.state))
+                    .or_default() += 1;
+            }
             o.not_ok += u32::from(a.outcome != Outcome::Ok);
+            o.peer_closed += u32::from(peer_closed(a.tcp_info.state));
             o.eintr += a.eintr;
             o.overruns += u32::from(pacer.end(time::monotonic_ns()));
         }
@@ -105,16 +118,17 @@ pub fn evaluate(o: &Observed) -> Vec<Check> {
             Status::Unreliable
         },
         summary: format!(
-            "{} connects: sync_connect {:.1} %, anomaly {}, not ok {}, p50 {} µs, p99 {} µs",
+            "{} connects: sync_connect {:.1} %, anomaly {}, not ok {}, peer closed {}, p50 {} µs, p99 {} µs",
             o.durations_ns.len(),
             100.0 * f64::from(o.sync) / n.max(1.0),
             o.anomalies,
             o.not_ok,
+            o.peer_closed,
             q(&dur, 0.5) / 1000,
             q(&dur, 0.99) / 1000
         ),
-        details: json!({ "connects": o.durations_ns.len(), "sync_connect": o.sync, "anomaly": o.anomalies,
-            "not_ok": o.not_ok, "duration_ns": { "p50": q(&dur, 0.5), "p99": q(&dur, 0.99), "max": dur.last() } }),
+        details: json!({ "connects": o.durations_ns.len(), "sync_connect": o.sync, "anomaly": o.anomalies, "anomaly_states": o.anomaly_states,
+            "not_ok": o.not_ok, "peer_closed": o.peer_closed, "duration_ns": { "p50": q(&dur, 0.5), "p99": q(&dur, 0.99), "max": dur.last() } }),
     };
     let pacing = Check {
         name: "pacing",

@@ -107,7 +107,7 @@ Checks (all unprivileged; the SYN checks need only loopback in the pod's own net
 | `tcpi_total_rto` present | `optlen` returned by `TCP_INFO` | present / absent (kernel feature, not a failure) |
 | Listener drop indicator | same test: `SK_MEMINFO_DROPS` and `TcpExt.ListenDrops` before/after | own `sk_drops` +1 → `SO_MEMINFO` usable; otherwise `run` uses the `listener_drops_suspected` fallback |
 | SYN backoff timing | duration of the retransmitted connect; `tcp_syn_retries`, `tcp_syn_linear_timeouts` sysctls | reported (≈1 s first retransmit; linear vs exponential where observable), informational |
-| Loopback `sync_connect` | 1000 loopback connects | fraction completing inside `connect()`; evidence for the loopback-control statement in §3.1. Also the **`anomaly` rate** (§3.2): every anomaly would invalidate a whole cycle, so a non-zero rate here is known before the first `run` (review round 3) |
+| Loopback `sync_connect` | 1000 loopback connects | fraction completing inside `connect()`; evidence for the loopback-control statement in §3.1. Also the **`anomaly` rate** (§3.2): every anomaly would invalidate a whole cycle, so a non-zero rate here is known before the first `run` (review round 3); the TCP state of each anomaly and the `peer_closed` count (§3.1) are reported |
 | Timer slack / pacing | the same 1000 loopback connects, paced at the default interval with the real pacer (§3.4); so the loopback, pacing and signal checks share one ~10 s loop | wake-up lateness p50/p99/max, overruns |
 | cgroup v2 | read `cpu.max`, `cpu.stat`, visible ancestors (§3.7) | readable / not, quota value, ancestors visible or `unknown` |
 | Signal isolation | send **SIGUSR2** (no-op handler installed for this check) to the process during a paced connect loop. Not SIGTERM: that would trigger the shutdown path of §8 and end `selftest` with exit 143 | no EINTR seen in the measuring thread |
@@ -136,8 +136,8 @@ k8s-netmeasure probe --target 10.0.0.5:17700 [--count 1] [--timeout 5s]
 ```
 
 - Each connect uses exactly the §3.1 sequence (same code path as `run`). The output is
-  one JSON line per connect: duration in ns, outcome, errno, `sync_connect`, SYN
-  retransmissions.
+  one JSON line per connect: duration in ns, outcome, errno, `sync_connect`,
+  `peer_closed` (§3.1), SYN retransmissions.
 - `--count` default 1, maximum 100.
 - No pacing, no cycles, no self-validation, no result file. It is a cross-check, not a
   measurement. The README says so, and `report` does not accept its output.

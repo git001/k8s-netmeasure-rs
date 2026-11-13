@@ -5,7 +5,7 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use netmeasure_cli::ProbeArgs;
-use netmeasure_core::measure::outcome::Outcome;
+use netmeasure_core::measure::outcome::{Outcome, peer_closed};
 use netmeasure_util::time::as_nanos_u64;
 use serde_json::json;
 
@@ -49,6 +49,7 @@ pub fn line(target: &str, seq: u32, a: &Attempt) -> serde_json::Value {
         "errno": a.errno,
         "error": a.errno.map(|e| std::io::Error::from_raw_os_error(e).to_string()),
         "sync_connect": a.sync_connect,
+        "peer_closed": peer_closed(a.tcp_info.state),
         "syn_retrans": a.tcp_info.total_retrans,
         "total_rto": a.tcp_info.total_rto,
         "eintr": a.eintr,

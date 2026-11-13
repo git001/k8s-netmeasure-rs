@@ -47,7 +47,7 @@ formatter. Atomic write: `<path>.tmp-<run_id>` → `fsync` → `rename` → `fsy
       "duration_ns":    [31211, 4120334, …],
       "result":         [0, 0, …],
       "syn_retrans":    [0, 0, …],          // -1 = unknown
-      "flags":          [1, 0, …],          // bit0 sync_connect, bit1 warmup, bit2 after_overrun, bit3 eintr
+      "flags":          [1, 0, …],          // bit0 sync_connect, bit1 warmup, bit2 after_overrun, bit3 eintr, bit4 peer_closed
       "reanchor":       { "index": [], "sched_offset_ns": [] },   // sparse: only re-anchored slots
       "errno":          { "index": [], "value": [] }               // sparse
     }

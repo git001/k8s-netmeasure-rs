@@ -1,5 +1,6 @@
 //! Loopback listeners for `selftest`: never a production listener (design §3.8).
 
+use std::collections::VecDeque;
 use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -19,7 +20,14 @@ pub fn bounded(backlog: i32) -> std::io::Result<(Socket, SocketAddrV4)> {
     Ok((s, addr))
 }
 
-/// A listener whose accept thread accepts and drops every connection until stopped.
+/// Accepted connections a [`Draining`] listener keeps open. Closing at once lets the
+/// client see the FIN before it reads `TCP_INFO` (`CLOSE_WAIT`, design §3.1); held
+/// connections are closed only after this many newer ones, long after the client
+/// has reset them.
+const HOLD: usize = 64;
+
+/// A listener whose accept thread accepts every connection until stopped and closes
+/// it [`HOLD`] connections later.
 pub struct Draining {
     pub addr: SocketAddrV4,
     stop: Arc<AtomicBool>,
@@ -37,11 +45,15 @@ impl Draining {
         let thread = std::thread::Builder::new()
             .name("accept".into())
             .spawn(move || {
+                let mut held = VecDeque::with_capacity(HOLD);
                 for conn in listener.incoming() {
                     if flag.load(Ordering::Relaxed) {
                         break;
                     }
-                    drop(conn);
+                    if held.len() == HOLD {
+                        held.pop_front();
+                    }
+                    held.push_back(conn);
                 }
             })?;
         Ok(Draining {

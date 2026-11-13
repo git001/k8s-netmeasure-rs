@@ -27,7 +27,8 @@ Logs are JSON lines on stderr; results go to stdout. Every subcommand takes
 `selftest` check.
 
 `probe` measures TCP connection establishment only: one JSON line per connect with
-the duration, the outcome, the errno and the SYN retransmissions. Without the tool, the
+the duration, the outcome, the errno, the SYN retransmissions and `peer_closed` (the
+target had already closed the connection when it was checked; still `ok`). Without the tool, the
 shell equivalent (no timing) is `exec 3<>/dev/tcp/<ip>/<port> && exec 3<&-`.
 
 ## Build and check
