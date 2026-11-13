@@ -49,6 +49,10 @@ pub struct Cli {
 pub enum Subcommands {
     /// Measurement target: accepts TCP connections on the measured port and never
     /// reads or writes on them. Runs until SIGTERM or SIGINT.
+    ///
+    /// WARNING: minimal protection only (no authentication, TLS or rate limit; the
+    /// control port discloses node details). NEVER expose it to the internet; run it
+    /// only inside the cluster network and restrict access.
     Listen(ListenArgs),
     /// Manual cross-check: a few connects with the measurement code path, one JSON
     /// line each. Not a measurement: no pacing, cycles or self-validation.

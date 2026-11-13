@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Security warning for `listen` (minimal protection only, never expose it to the
+  internet) in the README, in `listen --help` and as a WARN log line at every start.
 - `listen` control port: `GET /v1/context` (node context with provenance per field:
   `observed`, `declared`, `unknown`; kernel, boot id, uptime, CPU model and
   microcode, own `cpu.max`, TCP sysctls, MTU, NIC path) and `GET /v1/snapshot`

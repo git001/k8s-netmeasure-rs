@@ -9,6 +9,17 @@ in progress:** `probe`, `selftest` and `listen` (measured port and control port)
 
 ## Subcommands so far
 
+> [!WARNING]
+> **`listen` has only minimal protection. Never expose it to the internet.**
+> Neither port has authentication, TLS, rate limiting or an allowlist. The measured
+> port accepts every TCP connection, so anyone who can reach it can fill its accept
+> queue and falsify measurements. The control port discloses node details (kernel,
+> boot id, CPU, NIC drivers and ring sizes, cgroup limits) to anyone who can reach
+> it. With `hostNetwork`, NetworkPolicy does not apply. Run it only inside the
+> cluster network, only for the duration of a test series, and restrict access with
+> NetworkPolicy (overlay) or node firewall / cloud security groups (underlay). Never
+> create a `LoadBalancer` or `NodePort` Service, Route or Ingress for it.
+
 ```sh
 # Is this kernel suitable? Run once per node type before measuring (about 10 s).
 k8s-netmeasure selftest [--output selftest.json]

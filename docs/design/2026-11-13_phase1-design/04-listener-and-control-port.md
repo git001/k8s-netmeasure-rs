@@ -4,6 +4,12 @@ Part of the [Phase 1 design](README.md) · covers §4, §7 · previous: [Validit
 
 ---
 
+> **Security (decided in milestone 3b):** `listen` has only minimal protection: no
+> authentication, no TLS, no rate limiting, no allowlist. It must **never** be
+> reachable from the internet. The README carries this as a prominent warning, the
+> `listen` help text repeats it, and `listen` logs a WARN line at every start. Phase 2
+> manifests create no `LoadBalancer`/`NodePort` Service, Route or Ingress for it.
+
 ## 4. Listener
 
 ### 4.1 Two ports per process

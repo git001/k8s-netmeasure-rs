@@ -67,6 +67,11 @@ pub fn run(args: &ListenArgs) -> ExitCode {
         }
     };
     state.mark_started();
+    tracing::warn!(
+        addr = %listener.local,
+        control = %server.local,
+        "listen has minimal protection only (no authentication, TLS or rate limit); never expose it to the internet"
+    );
     tracing::info!(
         addr = %listener.local,
         control = %server.local,
