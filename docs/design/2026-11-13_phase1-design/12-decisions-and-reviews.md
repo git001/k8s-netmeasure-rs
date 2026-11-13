@@ -16,7 +16,7 @@ Part of the [Phase 1 design](README.md) · covers §16 · previous: [Implementat
 3. ~~**`selftest` subcommand.**~~ **Decided 2026-11-13:** yes, as a regular subcommand,
    documented exactly like the others (not hidden). See §3.8.
 4. ~~**Compression.**~~ **Decided 2026-11-13:** none; result files are plain JSON
-   (≈ 3 MB per 100,000 samples). See §5.
+   (≈ 2 MB per 100,000 samples; corrected in review round 3). See §5.
 5. ~~**Default ports.**~~ **Decided 2026-11-13:** no environment constraints; defaults
    stay as in §4.1: `listen`/`serve` 17700 (measured) and 17701 (control), `run`
    loopback-only ephemeral (measured). *Amended in review round 1:* `run`'s control
@@ -97,6 +97,33 @@ Decisions taken by the user in this round:
 | NIC families (raised by the user after the round) | NIC as a declared comparison factor, per-family stratification without pooling, kernel × NIC interaction with negative-control reading, observational evidence labels for direct NIC comparisons (§10.7); `--factor` replaces `--expect-change` |
 | document size | the single 1,550-line document was split into this directory with an index; section numbers unchanged (README) |
 
+### External review round 3 (2026-11-13)
+
+Last round before implementation. Points taken over after evaluation:
+
+- §3.5: cycles split by counted samples per target, warm-up added to cycle 0; with
+  evenly split slots two excluded cycles left 39 exceedances above p99, not 40;
+- §16: file size corrected to ≈ 2 MB per 100,000 samples (§5 was right);
+- §2: `rates.rs` is descriptive only, never a verdict;
+- §3.1: `ppoll` remaining time clamped to 0;
+- §3.2, §3.6, §3.8: `anomaly` listed consistently under `sample_count_short`; `selftest`
+  reports the anomaly rate;
+- §10.4: k defined once; timeouts couple the latency and failure families;
+- §10.5: boot age and boot skew checked per crossover period;
+- §5, §9.1: `config_source` in the example; clap `value_source()` cannot detect CLI
+  and env both set, the config layer reads the environment itself;
+- §10.6: `sequential` tolerates ≤ 1 s intersection (clock steps); `clock.synchronized`
+  recorded;
+- §11: cost estimate corrected to 1–2.5 CPU-hours; censored-p99 dimension and
+  criteria for the censored rule and the intersection-union reading.
+
+Decisions taken by the user in this round:
+
+| Topic | Decision |
+|---|---|
+| Bonferroni across strata makes the negative control expensive | with `--expect-effect-on`, strata get roles (effect / control / mixed) and form one intersection-union hypothesis without correction across strata; without it, Bonferroni over pairs × strata stays and the report prints the sample cost (§10.7) |
+| verdict under censoring | timeouts as +∞; `worse`/`better` only from a finite bound, never `equivalent` with an infinite bound, otherwise `inconclusive` "censored" (§10.4) |
+
 ### Left open on purpose, settled by implementation step 2 (§14)
 
 These are not design gaps. They can only be answered with data from the target
@@ -110,3 +137,7 @@ cluster, and the implementation order exists precisely for that.
    whether ≥ 10 failures is a sensible threshold, is checked on the first real runs
    (§10.4).
 3. **Pod-level cgroup inference.** Verified once on a node (§3.7, §14).
+4. **`anomaly` rate on the target kernel** (added in review round 3). Every anomaly
+   invalidates a cycle (§3.2). `selftest` measures the rate on loopback, step 2 on
+   both NIC families on real paths. If it is not zero, the cycle rule is revisited
+   before step 3.

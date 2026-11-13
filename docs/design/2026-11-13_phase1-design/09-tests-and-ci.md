@@ -11,7 +11,8 @@ Everything the prompt lists:
 - Statistics against known inputs:
   - block vs naive bootstrap on a synthetic AR(1)/regime-switching series, where the
     naive interval must be measurably narrower;
-  - censoring, tail below minimum;
+  - censoring, tail below minimum; censored verdict rule (§10.4): `worse` only from a
+    finite bound, never `equivalent` with an infinite bound;
   - all four verdicts, in particular `inconclusive` vs `equivalent`;
   - node-group mismatch rejection;
   - factor validation (§10.7): declared factor absent from the data → exit 5; an
@@ -76,9 +77,9 @@ The dimensions:
 | nodes | homogeneous; heterogeneous node effects (concurrent design) |
 | design | sequential; concurrent; concurrent + crossover with a period effect |
 | true effect on p99 | 0; inside the margin; just outside the margin; clear regression |
-| censoring | none; 0.5 % timeouts |
+| censoring | none; 0.5 % timeouts; 2 % timeouts (censored p99, §10.4) |
 
-**Not the full factorial.** All combinations would be 384 scenarios, and even a
+**Not the full factorial.** All combinations would be 576 scenarios, and even a
 perfectly calibrated method would fail a few of them by Monte-Carlo chance alone.
 Instead about **40 scenarios** are chosen so that every pair of dimension values
 occurs at least once (pairwise design), plus the combinations that matter most for
@@ -92,7 +93,10 @@ the test code.
   Standard error of an observed 95 % coverage: √(0.95·0.05/2000) ≈ 0.49 pp, so the
   band [93 %, 97 %] is ±4 standard errors. Chance failure of a correctly calibrated
   method: about 0.005 % per scenario, under 0.2 % for the whole grid.
-- Estimated cost: about 1 CPU-hour, ~15–20 min on a 4-core runner.
+- Estimated cost (corrected in review round 3): 40 × 2000 × 2000 = 1.6 × 10⁸
+  bootstrap replicates at 20–50 µs each (resampling plus quantile selection over
+  n ≈ 5000) is **1–2.5 CPU-hours** for the two-level designs, more with the third
+  level of the concurrent design. Plan about **1 h wall time on a 4-core runner**.
 - Per push: a smoke grid of 8 scenarios with R = 200. With SE ≈ 1.5 pp, the band
   there is [89 %, 100 %]. It only catches gross breakage; the weekly grid is the real
   gate.
@@ -103,6 +107,11 @@ Acceptance criteria (weekly grid):
   larger standard error);
 - false `worse`/`better` rate at true effect 0 ≤ **6.5 %** (5 % + 3 SE);
 - false `equivalent` rate at a true effect just outside the margin ≤ **6.5 %**;
+- censored scenarios: no `equivalent` while a bound is infinite, and the false
+  `worse`/`better` rate stays ≤ **6.5 %**;
+- intersection-union reading (§10.7; fixed extra scenarios with two strata): when
+  the control stratum has a true effect just outside the margin, the reading "effect
+  only where declared" occurs in ≤ **6.5 %** of repetitions;
 - the naive (non-block) bootstrap fails the coverage criterion on the dependent
   scenarios, which proves that the test can detect the problem.
 
@@ -138,7 +147,7 @@ Actions, since the repository is on GitHub). The workflow logic lives in Rust in
 | Lint | `cargo clippy --all-targets -- -D warnings` | any warning |
 | File size | `cargo xtask line-limit` | any `.rs` file > 400 lines, or > 200 lines without a `//! line-limit: <reason>` line, counted outside `#[cfg(test)]` items (§2). Parsed with `syn`, so test modules are recognised exactly rather than by a line pattern |
 | Argument count | `#![forbid(clippy::too_many_arguments)]` in every crate root; `cargo xtask line-limit` also checks that no `clippy.toml` / `.clippy.toml` raises `too-many-arguments-threshold` | any function over the limit (7); any attempt to `allow` it or to raise the threshold |
-| Config surface | unit test over the clap command tree (§9.1) | a parameter without env var, a misnamed env var, or a missing unknown-env check |
+| Config surface | unit test over the clap command tree (§9.1) | a parameter without env var, a misnamed env var, a missing unknown-env check, or a parameter set via CLI and env that is not rejected |
 | Tests | `cargo test --locked` (unit + integration, loopback only, reduced simulation grid) | any failure |
 | Simulation | full statistics simulation grid (§11), weekly | any acceptance criterion missed |
 | musl artifact | `cargo build --release --target x86_64-unknown-linux-musl` on the runner with `musl-tools`, then the test suite against it (§1) | build or test failure |

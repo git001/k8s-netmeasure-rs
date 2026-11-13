@@ -17,6 +17,8 @@ milestone ends with something that runs and is reviewed before the next one star
    pod, on nodes of every NIC type in the cluster). Also on the cluster:
    - verify the ancestor-throttling inference of §3.7 once via a debug shell on the
      node;
+   - check the `anomaly` rate (§3.2) on real paths of both NIC families; it must be
+     zero, or the cycle rule is revisited (§16);
    - take a first set of real baseline runs with `run`'s prototype, as the input for
      the semi-synthetic statistics check of §11.
 

@@ -1,7 +1,7 @@
 # k8s-netmeasure-rs — Phase 1 design
 
-Status: **all open questions decided; external review rounds 1 and 2 incorporated
-(2026-11-13); three points deliberately left open until implementation step 2
+Status: **all open questions decided; external review rounds 1–3 incorporated
+(2026-11-13); four points deliberately left open until implementation step 2
 (§16); awaiting final approval.** No production code exists yet.
 
 Scope: Phase 1 of [the agent prompt](../2026-11-13_k8s-netmeasure-rs-agent-prompt.md)
@@ -52,7 +52,7 @@ and what it does not.
   depends on.
 - Where the design deviates from or adds to the prompt, it says so explicitly:
   **[deviation]**, **[addition]**. Changes from review rounds are marked "(review
-  round 1)" / "(review round 2)".
+  round 1)" … "(review round 3)".
 - The metric prefix `netmeasure_` from the prompt is kept; no objection.
 - For a review: [12](12-decisions-and-reviews.md) lists what changed in each round.
   The parts most likely to profit from a second pair of eyes are

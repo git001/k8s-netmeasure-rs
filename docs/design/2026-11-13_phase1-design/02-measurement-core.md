@@ -44,7 +44,7 @@ deadline = t0 + timeout                       // absolute, monotonic
 r  = connect(fd, addr)                        // 0, or -1/EINPROGRESS, or -1/other errno
 if r == -1 && errno == EINPROGRESS:
     loop:
-        n = ppoll([fd: POLLOUT], deadline - now())
+        n = ppoll([fd: POLLOUT], max(0, deadline - now()))   // never negative (EINVAL)
         if n == -1 && errno == EINTR: continue    // re-wait for the REMAINING time only
         if n == 0: outcome = timeout; break       // deadline reached
         break                                     // any revents (POLLOUT, POLLERR, POLLHUP)
@@ -68,7 +68,11 @@ Details:
   signals with `pthread_sigmask` when it starts, so the kernel delivers them to
   another thread. EINTR is therefore not expected in the timed section. If it does
   occur, the loop continues waiting until the same absolute deadline; it never
-  restarts the full timeout. Each EINTR is counted per sample (flag bit).
+  restarts the full timeout. Each EINTR is counted per sample (flag bit). The
+  remaining time is clamped to 0: after an EINTR right at the deadline a negative
+  `timespec` would be `EINVAL` and turn a timeout into a `local_error`; `ppoll` with 0
+  checks readiness once more and otherwise reports the timeout correctly (review
+  round 3).
 - **POLLERR / POLLHUP** (e.g. RST from the target → refused) end the wait exactly like
   POLLOUT. The *time* of the event is what is measured; *which* event it was is
   determined from `SO_ERROR`.
@@ -101,7 +105,7 @@ this stays cheap, but the README will name it.
 | Outcome | Condition | In latency distribution? |
 |---|---|---|
 | `ok` | `SO_ERROR == 0` and `tcpi_state == ESTABLISHED` | yes |
-| `anomaly` | `SO_ERROR == 0` but any other `tcpi_state` | no; counted and logged at WARN, counts towards `sample_count_short` like a local error. Expected never to occur; the README tells the operator to report it |
+| `anomaly` | `SO_ERROR == 0` but any other `tcpi_state` | no; counted and logged at WARN, counts towards `sample_count_short` like a local error. Expected never to occur; `selftest` measures its rate before the first `run` (§3.8) and step 2 checks it on both NIC families (§16); the README tells the operator to report it |
 | `timeout` | `ppoll` timed out | yes, censored at ≥ timeout |
 | `refused` | `ECONNREFUSED` | no; counted, evaluated as failure |
 | `net_error` | `EHOSTUNREACH`, `ENETUNREACH`, `ECONNRESET`, `ETIMEDOUT`, … | no; counted, evaluated as failure |
@@ -203,11 +207,23 @@ if it exists, `tcp_syn_linear_timeouts` go into the node context.
   2). An earlier version used a fixed 20 s cycle. With 5000 samples on two targets one
   cycle was then exactly the 20 % tail reserve of §10.1, and the run ended with a tiny
   remainder cycle whose statistics were noise.
-  - Now the run's total slot count is split into `--cycles` (default 10) cycles whose
-    sizes differ by at most one slot, so there is no remainder cycle.
-  - One invalid cycle always costs 10 % of the data, independent of interval, target
-    count or sample count. Two excluded cycles still leave exactly the tail minimum
-    m = 40 for p99 at the default 5000 samples.
+  - Now the run is split into `--cycles` (default 10) cycles by **counted samples per
+    real target**: each cycle holds `samples / cycles` counted samples per target
+    (remainder distributed one by one from cycle 0), and **cycle 0 additionally holds
+    the warm-up** samples (corrected in review round 3). The loopback slots fall where
+    the global slot index puts them. Each cycle's slot count follows deterministically
+    and is recorded; there is no remainder cycle.
+  - At defaults in `pair` mode: 500 counted samples per cycle, cycle 0 with 550
+    target samples. The slot counts are `[611, 555, 556, 555, 556, 555, 556, 555, 556,
+    556]` = 5611.
+  - Why not distribute the *slots* evenly (the round-2 version): warm-up then eats
+    into cycle 0's counted samples only, so excluding two other cycles removed slightly
+    more than 20 % of the counted data. 3990 samples leave 39 exceedances above p99,
+    not 40.
+  - So one invalid cycle always costs exactly 10 % of the counted data, independent of
+    interval, target count, sample count or warm-up. Two excluded cycles leave exactly
+    4000 samples and therefore exactly the tail minimum m = 40 for p99 at the default
+    5000 samples.
   - The resulting cycle length is clamped to **[2 s, 60 s]**: more cycles for very long
     runs, fewer for very short ones; the effective count is recorded. At defaults in
     `pair` mode a cycle lasts ≈ 5.6 s, well inside the shutdown deadline (§8).

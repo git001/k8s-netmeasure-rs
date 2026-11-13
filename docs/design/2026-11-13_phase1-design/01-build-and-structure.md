@@ -168,9 +168,9 @@ crates/netmeasure-core/src/
     quantile.rs      quantile estimator with censoring
     order_ci.rs      distribution-free quantile CI (binomial)
     bootstrap.rs     stationary block bootstrap, two-/three-level resampling, block-length selection
-    verdict.rs       better / worse / equivalent / inconclusive, TOST, margins
-    rates.rs         exact conditional Poisson rate ratio, Wilson
-    multiplicity.rs  primary-quantity family, Bonferroni-adjusted levels across pairs
+    verdict.rs       better / worse / equivalent / inconclusive, TOST, margins, censored bounds
+    rates.rs         exact rate intervals, descriptive only (< 10 failures), never a verdict
+    multiplicity.rs  primary-quantity family, k (§10.4), Bonferroni levels, intersection-union roles
   report/
     model.rs         grouping, declared-design validation, crossover estimand, evidence label
     compare.rs       context comparison, expected/unexpected differences, refusal rules

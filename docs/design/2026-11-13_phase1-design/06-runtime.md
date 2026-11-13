@@ -99,9 +99,15 @@ in Phase 1.
   failure** (exit 2), not a silent override. clap would let the CLI win without
   notice; a Job spec with both `args:` and `env:` setting the same value is a
   configuration error, and in a support case it must be clear which value was used.
+  - **Implementation note** (review round 3): clap's `ArgMatches::value_source()`
+    reports only the *winning* source, so this case cannot be detected from it. The
+    config layer reads the environment itself (`std::env::vars_os`, prefix
+    `K8S_NETMEASURE_`) and fails for every argument whose `value_source()` is
+    `CommandLine` while its env var is also set. The config-surface test (§12) covers
+    exactly this case for every argument.
 - Empty values (`K8S_NETMEASURE_INTERVAL=`) are an error, not "unset".
 - **Provenance:** for every parameter the effective configuration in the result file
-  records its source (`cli` / `env` / `default`).
+  records its source (`cli` / `env` / `default`) in `run.config_source` (§5).
 - Enforcement: a unit test walks the complete clap command tree and asserts that every
   argument (except `--help`/`--version`) has an env var, that its name matches the
   derivation rule, and that no two arguments of one subcommand share a name.

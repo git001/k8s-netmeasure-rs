@@ -16,14 +16,15 @@ formatter. Atomic write: `<path>.tmp-<run_id>` → `fsync` → `rename` → `fsy
   "run": {
     "run_id": "01J…", "status": "complete" | "interrupted" | "failed",
     "started_at": "2026-…Z", "ended_at": "…Z",          // UTC, ns precision
-    "clock": { "realtime_at_origin": "…Z", "boot_id": "…" },   // maps monotonic offsets to wall clock
+    "clock": { "realtime_at_origin": "…Z", "boot_id": "…", "synchronized": true },   // maps monotonic offsets to wall clock; synchronized from adjtimex() at start and end
     "labels": { "phase": "baseline", "ticket": "CASE-0001" },
     "build_info": { "version": "…", "git_sha": "…", "rustc": "1.100.0", "target": "x86_64-unknown-linux-gnu", "glibc": "2.39", "static": false },
     "config": { "samples": 5000, "warmup": 50, "interval_ns": 10000000, "loopback_every": 10,
-                "cycles": 10, "cycle_slots": [562, 561, 561, 561, 561, 561, 561, 561, 561, 561],
+                "cycles": 10, "cycle_slots": [611, 555, 556, 555, 556, 555, 556, 555, 556, 556],
                 "timeout_ns": 5000000000, "backlog": 4096, "listener": "127.0.0.1:41873", "control": null, "path": "overlay",
                 "path_source": "declared" | "detected", "topology": "pair",
-                "load": { "threads": 0, "rate_per_s": 0 }, "shutdown_deadline_ns": …, "no_cgroup_check": false }
+                "load": { "threads": 0, "rate_per_s": 0 }, "shutdown_deadline_ns": …, "no_cgroup_check": false },
+    "config_source": { "samples": "default", "interval_ns": "env", "path": "cli", … },   // one entry per parameter (§9.1)
   },
   "source":  { "context_before": { … }, "context_after": { … } },
   "targets": [
@@ -32,7 +33,7 @@ formatter. Atomic write: `<path>.tmp-<run_id>` → `fsync` → `rename` → `fsy
       "control": "10.0.0.5:17701", "context_before": { … }, "context_after": { … } }
   ],
   "measurement": {
-    "cycles": [ { "cycle_id": "01J…", "index": 0, "first_sample": 0, "end_sample": 562,
+    "cycles": [ { "cycle_id": "01J…", "index": 0, "first_sample": 0, "end_sample": 611,
                   "started_at": "…Z", "ended_at": "…Z",
                   "validity": { "valid": true, "reasons": [], "annotations": [] },
                   "quality": { "wake_lateness_ns": { "p50": …, "p90": …, "p99": …, "max": … },

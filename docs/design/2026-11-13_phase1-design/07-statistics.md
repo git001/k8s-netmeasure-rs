@@ -24,7 +24,9 @@ Part of the [Phase 1 design](README.md) · covers §10.1–§10.5 · previous: [
   - The default 5000 samples give 50 exceedances for p99, which leaves 20 % headroom
     for excluded invalid cycles. That headroom is the reason to choose 40 rather than 50.
     With 10 cycles per run (§3.5) the headroom covers **two** excluded cycles, not one
-    (corrected in review round 2).
+    (corrected in review round 2). That holds exactly only because every cycle carries
+    the same number of counted samples and the warm-up is added to cycle 0 (corrected
+    in review round 3, §3.5).
   - Below m, the output is a warning and the required sample count, `n = m / (1 − p)`,
     instead of an interval.
 
@@ -114,6 +116,20 @@ Wall time below: `pair` mode, 10 ms interval, warm-up 50, loopback every 10th sl
     95 % interval also excludes 0.
   - `inconclusive`: otherwise.
   - Without a margin, `equivalent` is never reported.
+- **Verdicts under censoring** (added in review round 3). Timeouts enter the bootstrap
+  as +∞ (§10.1); ordering, and therefore percentile intervals, stay well defined.
+  - An interval bound is **infinite** when enough replicates are censored; a finite
+    bound is still a valid bound, because the true value behind a timeout is only
+    larger.
+  - `worse`/`better` is allowed only if the bound on the side of that conclusion is
+    finite and excludes 0 (or 1). Example: the test kernel's p99 is `≥ timeout`, the
+    reference's is 4 ms; the lower bound of Δ is finite and positive → `worse`.
+  - `equivalent` is **never** reported while any bound of the TOST interval is
+    infinite.
+  - Otherwise `inconclusive`, with the reason "censored" and the censored fraction per
+    side. A ratio with both sides censored is undefined and also `inconclusive`.
+  - At the default p99 this applies above 1 % timeouts; with `--quantiles p99.9`
+    already above 0.1 %.
 - `--equivalence-margin` requires `--equivalence-rationale`.
 - Effect size (absolute and relative) is always printed.
 - **Failures** (`timeout` + `refused` + `net_error` per connect; revised in review
@@ -139,7 +155,11 @@ Wall time below: `pair` mode, 10 ms interval, warm-up 50, loopback every 10th sl
     comparisons ≈ 14 %, 30 ≈ 79 % if independent).
   - **Primary quantity:** `--primary` (default `p99`) is the only latency quantile that
     gets a verdict. It is printed in the report header as "declared before measurement".
-  - **Correction across pairs only:** with k compared (pair, path) groups, each verdict
+  - **k is defined here, once** (review round 3): the number of independent verdicts
+    of one family that could each stand alone as a finding: compared (pair, path)
+    groups × NIC-family strata (§10.7). With `--expect-effect-on`, the strata form one
+    intersection-union hypothesis instead and count once (§10.7).
+  - **Correction across those k:** with k compared groups, each verdict
     uses Bonferroni-adjusted levels: two-sided `1 − 0.05/k` instead of 95 %, and TOST at
     `α = 0.05/k` per side instead of 90 %. The report prints k and the adjusted levels.
     In `pair` mode k = 1, so the levels stay at exactly 95 % / 90 %.
@@ -149,6 +169,11 @@ Wall time below: `pair` mode, 10 ms interval, warm-up 50, loopback every 10th sl
   - **Failure-rate verdicts** form their own family across the same k pairs and are
     corrected separately the same way. They answer a different question ("does it fail
     more often?") and do not count against the latency verdict.
+  - **The two families are coupled through timeouts** (review round 3). A timeout
+    enters the latency distribution censored (§3.2) *and* counts as a failure. A
+    change that shifts timeouts therefore moves both verdicts; the families are
+    corrected separately, but they are not independent evidence. The report says so
+    whenever timeouts are > 0 on either side.
   - The loopback local control and all diagnostics are outside every family; they warn
     or explain, they never decide.
 
@@ -161,10 +186,13 @@ Wall time below: `pair` mode, 10 ms interval, warm-up 50, loopback every 10th sl
 | `strong` | ≥ 5 runs per side **and** interleaved: ≥ 3 side switches in time order (e.g. A B A B …) | ≥ 3 nodes per group, both groups rebooted, crossover present with both halves |
 
 "Both groups rebooted" is decided from the node contexts. Two conditions must both
-hold:
+hold, **per crossover period** (review round 3): in a crossover every node has one
+boot per period, and each period is checked against its own boot (`boot_id` of that
+period's runs):
 1. Every node's boot time falls within **6 h** of the other group's boot times
    (`--max-boot-skew`).
-2. Every boot lies within **24 h** before that node's first run (`--max-boot-age`).
+2. Every boot lies within **24 h** before that node's first run in that period
+   (`--max-boot-age`).
    The reboot must belong to this experiment: two nodes booted an hour apart three
    weeks ago pass condition 1 but not this one (added in review round 2).
 

@@ -12,7 +12,7 @@ Part of the [Phase 1 design](README.md) · covers §3.6–§3.9 · previous: [Me
 | `listener_drops` | own or target listener `SK_MEMINFO_DROPS` delta > 0 | yes |
 | `listener_drops_suspected` | fallback, netns counters only | yes |
 | `target_set_changed` | a target's control port reports a different `listener_instance` or `boot_id`, or a target became unreachable on the control port | yes |
-| `sample_count_short` | any `local_error` or a missing slot | yes |
+| `sample_count_short` | any `local_error` or `anomaly` (§3.2), or a missing slot | yes |
 | `interrupted` | shutdown ended the cycle early | yes |
 | `scheduling_jitter` | p99 of pacing wake-up lateness > **1 ms**, or max > **10 ms** | **annotate only** |
 | `pacing_overrun` | overrun fraction > **5 %** | **annotate only** |
@@ -90,7 +90,7 @@ Checks (all unprivileged; the SYN checks need only loopback in the pod's own net
 | `tcpi_total_rto` present | `optlen` returned by `TCP_INFO` | present / absent (kernel feature, not a failure) |
 | Listener drop indicator | same test: `SK_MEMINFO_DROPS` and `TcpExt.ListenDrops` before/after | own `sk_drops` +1 → `SO_MEMINFO` usable; otherwise `run` uses the `listener_drops_suspected` fallback |
 | SYN backoff timing | duration of the retransmitted connect; `tcp_syn_retries`, `tcp_syn_linear_timeouts` sysctls | reported (≈1 s first retransmit; linear vs exponential where observable), informational |
-| Loopback `sync_connect` | 1000 loopback connects | fraction completing inside `connect()`; evidence for the loopback-control statement in §3.1 |
+| Loopback `sync_connect` | 1000 loopback connects | fraction completing inside `connect()`; evidence for the loopback-control statement in §3.1. Also the **`anomaly` rate** (§3.2): every anomaly would invalidate a whole cycle, so a non-zero rate here is known before the first `run` (review round 3) |
 | Timer slack / pacing | 1000 paced sleeps at the default interval | wake-up lateness p50/p99/max |
 | cgroup v2 | read `cpu.max`, `cpu.stat`, visible ancestors (§3.7) | readable / not, quota value, ancestors visible or `unknown` |
 | Signal isolation | send **SIGUSR2** (no-op handler installed for this check) to the process during a paced connect loop. Not SIGTERM: that would trigger the shutdown path of §8 and end `selftest` with exit 143 | no EINTR seen in the measuring thread |
