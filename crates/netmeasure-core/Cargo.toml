@@ -8,6 +8,9 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+# errno constants only; core never calls into libc (design §2: no I/O).
+libc.workspace = true
+serde.workspace = true
 
 [lints]
 workspace = true

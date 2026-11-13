@@ -10,6 +10,7 @@ description = "clap command definitions of k8s-netmeasure (design §2, §9.1)"
 
 [dependencies]
 clap.workspace = true
+netmeasure-util.workspace = true
 
 [lints]
 workspace = true

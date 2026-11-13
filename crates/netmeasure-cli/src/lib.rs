@@ -4,12 +4,23 @@
 //! `complexity` group, which is a hard error (E0453) under
 //! `#![forbid(clippy::too_many_arguments)]`. The CLI types therefore live here, under
 //! `deny` instead of `forbid`; `cargo xtask line-limit` still rejects every
-//! hand-written `allow` of the lint or of its groups. Parsing (reading argv and the
-//! environment) happens in the binary.
+//! hand-written `allow` of the lint or of its groups. Reading argv and the
+//! environment happens in the binary; everything here takes them as input.
 #![forbid(unsafe_code)]
 #![deny(clippy::too_many_arguments)]
 
-use clap::{Command, CommandFactory, Parser};
+pub mod env;
+pub mod log;
+pub mod parse;
+pub mod probe;
+pub mod selftest;
+pub mod surface;
+
+use clap::{Command, CommandFactory, Parser, Subcommand};
+
+pub use crate::log::{LogArgs, LogLevel};
+pub use crate::probe::ProbeArgs;
+pub use crate::selftest::SelftestArgs;
 
 /// Environment variable prefix for every parameter (design §9.1).
 pub const ENV_PREFIX: &str = "K8S_NETMEASURE_";
@@ -18,96 +29,56 @@ pub const ENV_PREFIX: &str = "K8S_NETMEASURE_";
 #[command(
     name = "k8s-netmeasure",
     about = "Reproducible TCP connect-latency measurement in Kubernetes and OpenShift",
+    long_about = "Reproducible TCP connect-latency measurement in Kubernetes and OpenShift.\n\n\
+        Every parameter can also be set as an environment variable K8S_NETMEASURE_<FLAG> \
+        (e.g. --timeout → K8S_NETMEASURE_TIMEOUT). Setting the same parameter on the \
+        command line and in the environment is an error, as is an unknown \
+        K8S_NETMEASURE_* variable.",
     arg_required_else_help = true
 )]
-pub struct Cli {}
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Subcommands,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum Subcommands {
+    /// Manual cross-check: a few connects with the measurement code path, one JSON
+    /// line each. Not a measurement: no pacing, cycles or self-validation.
+    Probe(ProbeArgs),
+    /// Verifies on this kernel what the measurement relies on: SYN retransmission
+    /// field, listener drop counter, SYN backoff, loopback behaviour, pacing, cgroup
+    /// and signal isolation.
+    Selftest(SelftestArgs),
+}
+
+impl Subcommands {
+    /// The logging arguments every subcommand carries.
+    pub fn log(&self) -> &LogArgs {
+        match self {
+            Subcommands::Probe(a) => &a.log,
+            Subcommands::Selftest(a) => &a.log,
+        }
+    }
+}
 
 /// The full command tree with the given `--version` text.
 pub fn command(version: &'static str) -> Command {
     Cli::command().version(version)
 }
 
-/// Expected env var name for a long flag: `--node-context-from` →
-/// `K8S_NETMEASURE_NODE_CONTEXT_FROM`.
-pub fn env_name(long: &str) -> String {
-    format!(
-        "{ENV_PREFIX}{}",
-        long.replace('-', "_").to_ascii_uppercase()
-    )
-}
-
-/// Config-surface rule (design §9.1, §12): every argument except `--help`/`--version`
-/// has a long flag and exactly the derived env var, and no subcommand defines an
-/// argument twice. Returns one message per violation.
-pub fn surface_problems(cmd: &Command) -> Vec<String> {
-    let mut problems = Vec::new();
-    let mut seen = std::collections::BTreeSet::new();
-    for arg in cmd.get_arguments() {
-        let id = arg.get_id().as_str();
-        if id == "help" || id == "version" {
-            continue;
-        }
-        if !seen.insert(id.to_owned()) {
-            problems.push(format!("{}: duplicate argument {id}", cmd.get_name()));
-        }
-        let Some(long) = arg.get_long() else {
-            problems.push(format!("{}: {id} has no long flag", cmd.get_name()));
-            continue;
-        };
-        let expected = env_name(long);
-        match arg.get_env() {
-            Some(env) if env.to_str() == Some(expected.as_str()) => {}
-            Some(env) => problems.push(format!(
-                "{}: --{long} has env {env:?}, expected {expected}",
-                cmd.get_name()
-            )),
-            None => problems.push(format!("{}: --{long} has no env var", cmd.get_name())),
-        }
-    }
-    for sub in cmd.get_subcommands() {
-        problems.extend(surface_problems(sub));
-    }
-    problems
-}
-
 #[cfg(test)]
 mod tests {
-    use clap::Arg;
-
     use super::*;
 
     #[test]
     fn every_argument_has_its_env_var() {
-        let problems = surface_problems(&command("test"));
+        let problems = surface::problems(&command("test"));
         assert!(problems.is_empty(), "{problems:#?}");
     }
 
     #[test]
     fn clap_definition_is_consistent() {
         command("test").debug_assert();
-    }
-
-    #[test]
-    fn env_name_follows_the_derivation_rule() {
-        assert_eq!(
-            env_name("node-context-from"),
-            "K8S_NETMEASURE_NODE_CONTEXT_FROM"
-        );
-    }
-
-    #[test]
-    fn surface_check_reports_every_kind_of_violation() {
-        let cmd = Command::new("x")
-            .arg(Arg::new("a").long("alpha"))
-            .arg(Arg::new("b").long("beta").env("WRONG"))
-            .arg(Arg::new("c").short('c'))
-            .arg(Arg::new("d").long("delta-x").env("K8S_NETMEASURE_DELTA_X"))
-            .subcommand(Command::new("sub").arg(Arg::new("e").long("e")));
-        let problems = surface_problems(&cmd);
-        assert_eq!(problems.len(), 4, "{problems:#?}");
-        assert!(problems[0].contains("--alpha has no env var"));
-        assert!(problems[1].contains("expected K8S_NETMEASURE_BETA"));
-        assert!(problems[2].contains("c has no long flag"));
-        assert!(problems[3].starts_with("sub: --e"));
     }
 }

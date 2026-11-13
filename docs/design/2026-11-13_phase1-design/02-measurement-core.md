@@ -135,7 +135,12 @@ unusable. If the kernel's `struct tcp_info` is long enough (checked via the retu
    avoids the racy case in which the queue only fills after the SYN; there the final
    ACK is dropped instead, the client is already `ESTABLISHED`, and nothing is
    retransmitted.
-3. After ~1.5 s, accept one queued connection, so the retransmitted SYN succeeds.
+3. After ~0.5 s, accept one queued connection, so the first retransmitted SYN (at
+   ~1 s) succeeds. *Corrected in milestone 2:* an earlier version said ~1.5 s, which
+   is after the first retransmission; that one would be dropped as well and the
+   connect would show two retransmissions, contradicting the `== 1` expectation
+   below. Verified on a 7.x kernel: 1.04 s, `sk_drops` +1, `ListenDrops` +1,
+   `tcpi_total_retrans` 1.
 
 Evaluation, three possible results:
 
@@ -231,6 +236,6 @@ if it exists, `tcp_syn_linear_timeouts` go into the node context.
     again distributed evenly).
   - `serve` (Phase 3) has no run end and uses a fixed 10 s cycle.
 - Around each cycle, on the main thread, outside any timed section: before-snapshot
-  (own cgroup, own listener `sk_drops`, netstat; underlay ethtool; every target's
-  control-port `snapshot`) → measuring thread runs the cycle (load threads run
+  (own cgroup, own listener `sk_drops`, netstat; underlay ethtool; the **NIC path**
+  of the own node and of every target, §3.6; every target's control-port `snapshot`) → measuring thread runs the cycle (load threads run
   continuously) → after-snapshot → validity evaluation (core).

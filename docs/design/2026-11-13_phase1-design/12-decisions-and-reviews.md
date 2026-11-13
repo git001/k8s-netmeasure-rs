@@ -124,6 +124,21 @@ Decisions taken by the user in this round:
 | Bonferroni across strata makes the negative control expensive | with `--expect-effect-on`, strata get roles (effect / control / mixed) and form one intersection-union hypothesis without correction across strata; without it, Bonferroni over pairs × strata stays and the report prints the sample cost (§10.7) |
 | verdict under censoring | timeouts as +∞; `worse`/`better` only from a finite bound, never `equivalent` with an infinite bound, otherwise `inconclusive` "censored" (§10.4) |
 
+### Milestone 2 planning: NIC family is per host (2026-11-13)
+
+Real node data from the target environment showed nodes of the **same instance
+type, kernel and OS build with different NIC families**; the family follows the host,
+and machines are recreated often enough to move between families. Decided by the user
+(all five points):
+
+| Topic | Decision |
+|---|---|
+| same instance type, different family | report detects and states it; for `--factor nic` it removes the instance-type confound (§10.7) |
+| NIC path during a run | checked around every cycle (VF present, bound driver, default-route interface); a change invalidates the cycle as `nic_changed` (§3.6) |
+| family change between crossover periods | node is a context mismatch: exit 5, or excluded with a warning under `--allow-context-mismatch nic_family`; only stable nodes count for the negative control (§10.6) |
+| host CPU as a confound | CPU model and microcode in the node context (§5) |
+| choosing pairs | inventory of node → family via `listen` + `/v1/context` before every test series and after every reboot (§13) |
+
 ### Left open on purpose, settled by implementation step 2 (§14)
 
 These are not design gaps. They can only be answered with data from the target

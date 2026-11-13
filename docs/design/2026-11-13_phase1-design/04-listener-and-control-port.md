@@ -89,7 +89,7 @@ port, one protocol**. That matches the prompt's "`/ready` next to `/metrics`".
 | `GET /ready` | readiness probe: `200` once startup has finished and the measured listener is accepting; `503` before that and from the first shutdown signal on, so Kubernetes stops routing to a terminating listener |
 | `GET /v1/info` | build info, `listener_instance` (ULID created at start), measured port, effective backlog |
 | `GET /v1/context` | node context (§5) |
-| `GET /v1/snapshot` | monotonic timestamp, `boot_id`, `listener_instance`, own `SK_MEMINFO_DROPS`, accepted/aborted counts, netns `ListenOverflows/ListenDrops`, own cgroup cpu.stat; underlay: netstat and ethtool allowlist |
+| `GET /v1/snapshot` | monotonic timestamp, `boot_id`, `listener_instance`, own `SK_MEMINFO_DROPS`, accepted/aborted counts, netns `ListenOverflows/ListenDrops`, own cgroup cpu.stat; **NIC path** (§3.6: per physical interface present/driver, default-route interface); underlay: netstat and ethtool allowlist |
 | `GET /metrics` | Phase 3 only |
 
 - Versioning is in the path (`/v1/`). Response bodies are the `schema/control.rs`

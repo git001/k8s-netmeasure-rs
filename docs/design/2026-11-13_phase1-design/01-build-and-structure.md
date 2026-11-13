@@ -72,7 +72,8 @@ project containing every crate below. Results:
 | Crate | Version | Features | Use | Note |
 |---|---|---|---|---|
 | `socket2` | 0.6.5 | — | socket creation, `SO_LINGER`, non-blocking connect | |
-| `libc` | 0.2.191 | — | `getsockopt(TCP_INFO / SO_MEMINFO / SO_ERROR)`, `ppoll`, `clock_nanosleep`, `prctl(PR_SET_TIMERSLACK)`, `ioctl(SIOCETHTOOL)` | |
+| `libc` | 0.2.191 | — | `getsockopt(TCP_INFO / SO_MEMINFO)` with the filled length, `tcp_info` offsets via `offset_of!`, `ioctl(SIOCETHTOOL)` | only where `nix` has no safe wrapper |
+| `nix` | 0.31.3 | `signal`, `poll`, `time`, `process`, `pthread`; no defaults | safe wrappers: signal mask, `sigaction`, `kill`, `ppoll`, `clock_gettime`, `clock_nanosleep`, `prctl(PR_SET_TIMERSLACK)` (added in milestone 2 review) | `pthread` only for the `EINTR` test |
 | `clap` | 4.6.7 | `derive`, `env` | CLI; every parameter also as `K8S_NETMEASURE_*` (§9.1) | |
 | `serde` / `serde_json` | 1.0.229 / 1.0.154 | `derive` | result file, report JSON, control-port bodies | custom formatter, §5 |
 | `tokio` | 1.54.1 | `rt`, `net`, `time` (no `rt-multi-thread`, no `signal`) | `current_thread` runtime for the control port | needed by `kube` in Phase 2 anyway |
@@ -149,9 +150,12 @@ would exceed clippy's limit (7) takes a context struct instead (e.g. `ProbeCtx`,
 `CycleCtx`, `ReportCtx`), named after what it groups rather than `Params`.
 
 **`unsafe` policy.** `#![forbid(unsafe_code)]` in core and util. In the binary, all
-`libc` calls (`getsockopt`, `ppoll`, `clock_nanosleep`, `prctl`, `ioctl`) live in a
+syscalls (`getsockopt`, `ppoll`, `clock_nanosleep`, `prctl`, `ioctl`) live in a
 single module `sys/`, which is the only place with `#[allow(unsafe_code)]`; the rest of
-the crate is `#![deny(unsafe_code)]`.
+the crate is `#![deny(unsafe_code)]`. Inside `sys/`, the safe `nix` API is used
+wherever it covers the call (milestone 2 review); raw `libc` remains only for
+`getsockopt` of partially filled buffers and `ioctl(SIOCETHTOOL)`, plus the inherently
+unsafe `sigaction`.
 
 ```
 crates/netmeasure-util/src/
@@ -188,7 +192,7 @@ crates/netmeasure-core/src/
 
 crates/k8s-netmeasure/src/
   main.rs, cli.rs, exit.rs     (main.rs sets the mimalloc #[global_allocator])
-  sys/               the only unsafe module: thin wrappers over libc syscalls
+  sys/               the only unsafe module: thin wrappers over syscalls (nix, libc)
   shutdown.rs        signal flags
   logging.rs         tracing setup, field names (§9)
   measure/

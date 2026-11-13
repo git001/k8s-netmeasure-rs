@@ -4,3 +4,7 @@
 //! Everything in it is therefore unit-testable.
 #![forbid(unsafe_code)]
 #![forbid(clippy::too_many_arguments)]
+
+pub mod diag;
+pub mod measure;
+pub mod stats;

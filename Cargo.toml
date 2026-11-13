@@ -26,12 +26,20 @@ publish = false
 # A crate is listed here only once it is used; versions for later milestones are in
 # the design table and are re-resolved when they are added.
 [workspace.dependencies]
+netmeasure-util = { path = "crates/netmeasure-util" }
+netmeasure-core = { path = "crates/netmeasure-core" }
 netmeasure-cli = { path = "crates/netmeasure-cli" }
 clap = { version = "4.6.7", features = ["derive", "env"] }
 mimalloc = "0.1.52"
+libc = "0.2.191"
+nix = { version = "0.31.3", default-features = false, features = ["signal", "poll", "time", "process", "pthread"] }
+socket2 = { version = "0.6.5", features = ["all"] }
+serde = { version = "1.0.229", features = ["derive"] }
+tracing = { version = "0.1.44", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "0.3.23", features = ["json"] }
 assert_cmd = "2.2.2"
 jiff = { version = "0.2.43", default-features = false, features = ["std"] }
-serde_json = "1.0.154"
+serde_json = { version = "1.0.154", default-features = false, features = ["std"] }
 syn = { version = "3.0.10", features = ["full"] }
 proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
 

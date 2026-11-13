@@ -7,7 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Design: the per-cycle NIC path check also compares RX/TX ring sizes; a change
+  invalidates the cycle as `nic_changed`.
+- Design: the NIC family is treated as a property of the host, not of the instance
+  type. The NIC path is checked around every cycle (`nic_changed`), a family change
+  between crossover periods is a context mismatch, the node context gains the CPU
+  model, and the report states when one instance type occurs with several families.
+
 ### Added
+
+- Node facts list every physical interface with its driver and RX/TX ring sizes
+  (current and maximum, `ethtool -g` equivalent, no capability needed); a size the
+  driver does not report is `null`. `selftest --output` includes them.
+- `--log-level` (`K8S_NETMEASURE_LOG_LEVEL`) on every subcommand: `error`, `warn`,
+  `info` (default), `debug`, `trace`; `debug` logs parameter sources and full
+  `selftest` check data.
+- Atomic result write: temporary file, `fsync`, `rename`, then `fsync` of the
+  directory (design §5), so a completed file also survives a node crash.
+- `probe` subcommand: a few connects (`--count`, 1–100) to `--target` with the exact
+  measurement code path; one JSON line per connect on stdout with outcome, duration,
+  errno, `sync_connect`, SYN retransmissions. Exit 0 if every connect is `ok`, 7
+  otherwise.
+- `selftest` subcommand: verifies on the running kernel the SYN retransmission field,
+  the listener drop indicator (`SO_MEMINFO`), SYN backoff, `tcpi_total_rto`, loopback
+  connect behaviour and anomaly rate, pacing lateness, signal isolation of the
+  measuring thread, and cgroup v2 visibility. Summary table on stdout, one JSON log
+  line per check, `--output` for a JSON report. Exit 0, or 6 if a check was
+  inconclusive. The node-listener check follows with `listen`.
+- Measurement core: non-blocking connect with `ppoll` on an absolute deadline
+  (`EINTR` never extends the timeout), `SO_ERROR` and `TCP_INFO` read outside the
+  timed section, `ok` only with `ESTABLISHED`, outcome classes `ok`, `timeout`,
+  `refused`, `net_error`, `local_error`, `anomaly`; a measuring thread with all
+  asynchronous signals blocked and 1 ns timer slack; the pacer with the four overrun
+  rules; slot and cycle plan. `TCP_INFO` and `SO_MEMINFO` offsets come from `libc`
+  (`offset_of!`); a field beyond the length the kernel filled is `unknown`, never 0.
+  Signal mask, `sigaction`, `kill`, `ppoll`, clocks and timer slack go through the
+  safe `nix` API; `unsafe` remains only for installing the signal handler and for
+  `getsockopt` of partially filled buffers.
+- Configuration rules: every parameter also as `K8S_NETMEASURE_<FLAG>`; unknown or
+  empty `K8S_NETMEASURE_*` variables and the same parameter on the command line and
+  in the environment are errors (exit 2); variables of other subcommands are ignored
+  and logged.
 
 - Phase 1 design in `docs/design/2026-11-13_phase1-design/`, after three external
   review rounds.

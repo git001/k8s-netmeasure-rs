@@ -29,6 +29,15 @@ Part of the [Phase 1 design](README.md) · covers §10.6–§10.7 · previous: [
   = reference kernel, `--after` = test kernel, across both periods). The report
   verifies that the node sets actually swap between the periods; otherwise exit 5.
   Periods, groups and node assignment are all printed and stored in the report JSON.
+- **NIC family must be stable per node across periods** (added in milestone 2
+  planning). The kernel swap needs a reboot, and a rebooted or recreated machine can
+  land on a host with another NIC family. A node whose observed family (or CPU model)
+  differs between period 1 and period 2 measures the host, not the kernel. Such a
+  node is a context mismatch: exit 5, unless `--allow-context-mismatch nic_family`
+  is given, in which case the node is excluded from the crossover with a warning
+  naming it. Only nodes with a stable family count for the negative control
+  (below). The same check applies across the runs of one side in the sequential
+  design.
 - **Crossover estimand, defined explicitly** (review round 1). For quantile `p` the
   kernel effect θ is written on the scale chosen by the margin (made consistent in
   review round 2):
@@ -85,12 +94,19 @@ the treatment:
 | `--factor` | Must differ between the sides | Allowed to differ, printed as a known confound | Everything else |
 |---|---|---|---|
 | `kernel` | kernel release / build | — | must match |
-| `nic` | NIC model, driver, driver version, firmware | instance type, because the NIC generation is often tied to the instance or host generation | must match, including the kernel |
+| `nic` | NIC model, driver, driver version, firmware | instance type and CPU model (host generation); printed with the check below | must match, including the kernel |
 | `nic-settings` | the changed NIC settings (ring sizes, channels, …) | — | must match, including NIC model, driver and firmware |
 | `load` | load parameters | — | must match |
 
 - A factor field that does **not** differ between the sides is an error (exit 5,
   "declared factor not present in the data").
+- **Same instance type, different NIC family** (added in milestone 2 planning). The
+  same instance type can be backed by hosts with different NIC hardware. The report
+  detects this per comparison and states it in the header: for `--factor nic`,
+  "instance type identical on both sides: the comparison is not confounded with the
+  instance type" (the CPU model is still shown, as it may differ by host); for every
+  other factor, "this instance type occurs with several NIC families", which is why
+  results are stratified by observed family and never by instance type.
 - Any other difference is refused unless `--allow-context-mismatch` names it (§10.6).
 
 **NIC family and stratification.**

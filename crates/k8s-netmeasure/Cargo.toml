@@ -10,11 +10,21 @@ description = "Reproducible TCP connect-latency measurement in Kubernetes and Op
 
 [dependencies]
 clap.workspace = true
-netmeasure-cli.workspace = true
+libc.workspace = true
 mimalloc.workspace = true
+nix.workspace = true
+netmeasure-cli.workspace = true
+netmeasure-core.workspace = true
+netmeasure-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+socket2.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
 
 [dev-dependencies]
 assert_cmd.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

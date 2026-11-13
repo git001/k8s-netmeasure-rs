@@ -19,6 +19,12 @@ Everything the prompt lists:
     undeclared difference → exit 5 unless allowed;
   - NIC-family stratification: mixed families on one side are never pooled; the
     `unknown` stratum is reported separately;
+  - NIC path per cycle: a VF that disappears, reappears or changes driver between
+    snapshots → `nic_changed`; an unreachable node listener → `unknown`, never
+    "unchanged";
+  - crossover with a node whose family changes between periods → exit 5, or exclusion
+    with a warning under `--allow-context-mismatch nic_family`;
+  - "same instance type, different NIC family" is detected and stated in the header;
   - kernel × NIC interaction on synthetic data with an effect in one stratum only:
     the effect must be found there, `equivalent` in the control stratum, and the
     interaction interval must exclude zero;

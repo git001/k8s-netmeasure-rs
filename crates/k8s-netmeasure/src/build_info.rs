@@ -18,6 +18,14 @@ pub const BUILD_INFO: BuildInfo = BuildInfo {
 };
 
 impl BuildInfo {
+    /// The `build_info` object of result and report files (§5).
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "version": self.version, "git_sha": self.git_sha, "rustc": self.rustc,
+            "target": self.target, "static": self.is_static,
+        })
+    }
+
     /// One line for `--version`, e.g.
     /// `0.1.0 (git 0123abcd, rustc 1.100.0, x86_64-unknown-linux-gnu, dynamic)`.
     pub fn version_line(&self) -> String {

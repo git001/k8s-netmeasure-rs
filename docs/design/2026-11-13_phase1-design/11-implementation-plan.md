@@ -30,7 +30,9 @@ milestone ends with something that runs and is reviewed before the next one star
    produces any verdict.
 5. **`report`.** Declared designs and factors, crossover, comparability, NIC-family
    stratification and the kernel × NIC interaction (§10.7), text and JSON output.
-6. **Background load, underlay diagnostics (ethtool, netstat), README.**
+6. **Background load, underlay diagnostics (ethtool, netstat), README.** The ethtool
+   ring sizes (`ETHTOOL_GRINGPARAM`) already arrived in milestone 2; step 6 adds
+   driver info, channels and the statistics allowlist.
 
 ---
 

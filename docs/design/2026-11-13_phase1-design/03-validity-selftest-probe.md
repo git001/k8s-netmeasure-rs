@@ -13,10 +13,27 @@ Part of the [Phase 1 design](README.md) · covers §3.6–§3.9 · previous: [Me
 | `listener_drops_suspected` | fallback, netns counters only | yes |
 | `target_set_changed` | a target's control port reports a different `listener_instance` or `boot_id`, or a target became unreachable on the control port | yes |
 | `sample_count_short` | any `local_error` or `anomaly` (§3.2), or a missing slot | yes |
+| `nic_changed` | the **NIC path** of the source or of a target differs between before- and after-snapshot, or from the run's first cycle: the VF disappeared, appeared, is bound to another driver, or its ring sizes changed (added in milestone 2 planning, see below) | yes |
 | `interrupted` | shutdown ended the cycle early | yes |
 | `scheduling_jitter` | p99 of pacing wake-up lateness > **1 ms**, or max > **10 ms** | **annotate only** |
 | `pacing_overrun` | overrun fraction > **5 %** | **annotate only** |
 | `netns_listen_drops` | netns `ListenOverflows/ListenDrops` delta > 0 without own `sk_drops` | annotate only |
+
+**NIC path** (added in milestone 2 planning). The same instance type can run on hosts
+with different NIC hardware, and an accelerated-networking VF can be removed and
+re-added during host maintenance; traffic then falls back to the slower synthetic
+interface. Neither is visible from the instance type, and both change the measured
+path without any change to the software under test. So the NIC path is checked
+around **every cycle**, not only in the run's context:
+- per physical interface: present or not, the bound driver (`readlink
+  /sys/class/net/<if>/device/driver`) and the RX/TX ring sizes (`ETHTOOL_GRINGPARAM`,
+  added in the milestone 2 review: a ring resize, e.g. by a tuning daemon, changes the
+  path's queueing), plus which interface carries the default route; a few
+  `readlink`/`stat` calls and one `ioctl` per interface, cheap enough for every cycle;
+- observed directly in the underlay; in the overlay through the node listener
+  (`--node-context-from`, §5), whose `/v1/snapshot` carries the same fields;
+- if the node listener cannot be reached for a cycle, the NIC path of that cycle is
+  `unknown` and annotated, as for the context (§5); it never counts as unchanged.
 
 Rationale for "annotate only" on jitter and overrun: lateness affects the *start* of
 a sample, not the timed connect itself, so it does not invalidate the measured
@@ -86,15 +103,15 @@ Checks (all unprivileged; the SYN checks need only loopback in the pod's own net
 
 | Check | Method | Result |
 |---|---|---|
-| SYN retransmission field | §3.3: fill the accept queue until a connect stalls, accept after ~1.5 s | confirmed / unreliable (`run` then writes `unknown`) / **inconclusive** if no SYN drop could be provoked — per the three-way table in §3.3 |
+| SYN retransmission field | §3.3: fill the accept queue until a connect stalls, accept after ~0.5 s (before the first retransmission) | confirmed / unreliable (`run` then writes `unknown`) / **inconclusive** if no SYN drop could be provoked — per the three-way table in §3.3 |
 | `tcpi_total_rto` present | `optlen` returned by `TCP_INFO` | present / absent (kernel feature, not a failure) |
 | Listener drop indicator | same test: `SK_MEMINFO_DROPS` and `TcpExt.ListenDrops` before/after | own `sk_drops` +1 → `SO_MEMINFO` usable; otherwise `run` uses the `listener_drops_suspected` fallback |
 | SYN backoff timing | duration of the retransmitted connect; `tcp_syn_retries`, `tcp_syn_linear_timeouts` sysctls | reported (≈1 s first retransmit; linear vs exponential where observable), informational |
 | Loopback `sync_connect` | 1000 loopback connects | fraction completing inside `connect()`; evidence for the loopback-control statement in §3.1. Also the **`anomaly` rate** (§3.2): every anomaly would invalidate a whole cycle, so a non-zero rate here is known before the first `run` (review round 3) |
-| Timer slack / pacing | 1000 paced sleeps at the default interval | wake-up lateness p50/p99/max |
+| Timer slack / pacing | the same 1000 loopback connects, paced at the default interval with the real pacer (§3.4); so the loopback, pacing and signal checks share one ~10 s loop | wake-up lateness p50/p99/max, overruns |
 | cgroup v2 | read `cpu.max`, `cpu.stat`, visible ancestors (§3.7) | readable / not, quota value, ancestors visible or `unknown` |
 | Signal isolation | send **SIGUSR2** (no-op handler installed for this check) to the process during a paced connect loop. Not SIGTERM: that would trigger the shutdown path of §8 and end `selftest` with exit 143 | no EINTR seen in the measuring thread |
-| Node listener (with `--node-context-from`) | fetch `/v1/context`, compare `boot_id` | same node confirmed, or mismatch (§5) |
+| Node listener (with `--node-context-from`) | fetch `/v1/context`, compare `boot_id` | same node confirmed, or mismatch (§5). Arrives with `listen` in milestone 3; until then `selftest` has no such flag |
 
 - Output: one JSON log line per check (as everywhere), plus a summary table on
   stdout at the end, and `--output <file>` for a JSON report with build info and node

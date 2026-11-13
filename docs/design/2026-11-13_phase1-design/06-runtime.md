@@ -131,3 +131,8 @@ in Phase 1.
   `target_node="loopback"`. One INFO line per cycle per path; one WARN per sample above
   `--outlier-threshold` (default 20 ms); WARN for an invalid cycle; ERROR for a target
   unreachable for a whole cycle.
+- **Log level** (added in milestone 2 review): every subcommand takes `--log-level`
+  (`error`, `warn`, `info`, `debug`, `trace`; `K8S_NETMEASURE_LOG_LEVEL`), default
+  `info`. `debug` adds detail for development and support cases (parameter sources,
+  full `selftest` check data). The measuring thread never logs inside a cycle, so no
+  level can disturb the timed section; filtered-out levels cost only a level check.

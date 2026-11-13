@@ -2,10 +2,33 @@
 
 Reproducible TCP connect-latency measurement in Kubernetes and OpenShift.
 
-**Status: milestone 1 of the [Phase 1 implementation plan](docs/design/2026-11-13_phase1-design/11-implementation-plan.md)
-(scaffold).** The binary has no measurement subcommands yet; `listen`, `run`,
-`report`, `selftest` and `probe` follow in the next milestones. The design is in
+**Status: milestone 2 of the [Phase 1 implementation plan](docs/design/2026-11-13_phase1-design/11-implementation-plan.md)
+(measurement core, `probe`, `selftest`).** `listen`, `run` and `report` follow in the
+next milestones. The design is in
 [docs/design/2026-11-13_phase1-design/](docs/design/2026-11-13_phase1-design/README.md).
+
+## Subcommands so far
+
+```sh
+# Is this kernel suitable? Run once per node type before measuring (about 10 s).
+k8s-netmeasure selftest [--output selftest.json]
+
+# Manual cross-check of one path, same code path as the measurement (not a measurement).
+k8s-netmeasure probe --target 10.0.0.5:17700 [--count 5] [--timeout 5s]
+```
+
+Every parameter can also be set as `K8S_NETMEASURE_<FLAG>`, e.g.
+`K8S_NETMEASURE_TARGET=10.0.0.5:17700`. Setting the same parameter both ways, an
+unknown `K8S_NETMEASURE_*` variable, or an empty one is an error (exit 2).
+
+Logs are JSON lines on stderr; results go to stdout. Every subcommand takes
+`--log-level error|warn|info|debug|trace` (`K8S_NETMEASURE_LOG_LEVEL`, default `info`);
+`debug` adds details such as the source of every parameter and the full data of each
+`selftest` check.
+
+`probe` measures TCP connection establishment only: one JSON line per connect with
+the duration, the outcome, the errno and the SYN retransmissions. Without the tool, the
+shell equivalent (no timing) is `exec 3<>/dev/tcp/<ip>/<port> && exec 3<&-`.
 
 ## Build and check
 

@@ -76,6 +76,13 @@ deliverable**, not Phase 2. Phase 2 adds only the chart around it.
 
 Phase 1 ad hoc use with the image:
 
+- **Inventory first** (added in milestone 2 planning). Because the NIC family is a
+  property of the host, not of the instance type (§10.7), a test plan starts with a
+  list of which node currently has which family: `listen` as an underlay DaemonSet on
+  all nodes, then `curl http://<node-ip>:17701/v1/context` per node. Pairs with the
+  same and with different families are chosen from that list, and the list is taken
+  again after every reboot or machine replacement. No extra feature is needed; the
+  README documents the step.
 - **Overlay:** a plain pod running the image, e.g.
   `oc run netmeasure-a --image=<image> -- listen …`.
 - **Underlay:** a pod with `hostNetwork: true` under the `hostnetwork-v2` SCC. This is

@@ -78,9 +78,18 @@ without compression. **Decided 2026-11-13: no compression**; result files are pl
 JSON.
 
 **Node context** fields: node name, zone, instance type, kernel (`uname -r`, `-v`),
-boot_id, uptime, CPU quota, `somaxconn`, `tcp_syn_retries`, `tcp_syn_linear_timeouts`,
-MTU, and per physical interface (anything with `/sys/class/net/*/device`): driver,
-driver version, firmware, ring sizes, channels.
+boot_id, uptime, CPU quota, **CPU model** (`/proc/cpuinfo` `model name`, plus
+`microcode`; added in milestone 2 planning: hosts behind the same instance type can
+differ in CPU as well as NIC), `somaxconn`, `tcp_syn_retries`,
+`tcp_syn_linear_timeouts`, MTU, and per physical interface (anything with
+`/sys/class/net/*/device`): driver, driver version, firmware, ring sizes, channels.
+**The NIC family is always observed, never derived from the instance type** (§10.7).
+**Ring sizes** (current and maximum, RX and TX, via `SIOCETHTOOL`/`ETHTOOL_GRINGPARAM`,
+no capability needed) are in the node facts since the milestone 2 review: hosts
+behind the same instance type were seen with different TX ring sizes per NIC family.
+A direction whose maximum the driver reports as 0 is `null` (`ethtool -g`: `n/a`). In a
+pod network namespace no physical interface is visible; the underlay view comes from
+a `hostNetwork` process (§5, node listener).
 
 Every field carries a provenance:
 - `observed` — read by this process;
