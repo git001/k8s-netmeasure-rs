@@ -104,13 +104,19 @@ requires.
 
 ## 2. Crate and module layout
 
-The two crates named in the prompt, plus **[addition]** a shared utility crate and an
-`xtask` tooling crate:
+The two crates named in the prompt, plus **[addition]** a shared utility crate, a CLI
+definition crate and an `xtask` tooling crate:
 
 - **`netmeasure-core`** does **no I/O at all** (no sockets, no files, no clock reads, no
   logging) and is therefore fully unit-testable.
 - **`k8s-netmeasure`** does all I/O and calls into core.
 - **`netmeasure-util`** holds every helper that more than one module needs (rule below).
+- **`netmeasure-cli`** holds the clap command definitions and the config-surface
+  check (§9.1). Parsing argv and the environment happens in the binary. *Added in
+  milestone 1:* clap's derive output allows the whole clippy `complexity` group, which
+  is a hard compile error (E0453) under `#![forbid(clippy::too_many_arguments)]`. The
+  derive types therefore live in this one crate, whose root carries `#![deny(…)]`
+  instead of `forbid`; everything else keeps `forbid`.
 - **`xtask`** holds repository checks (§12). It is not shipped.
 
 Measurement and diagnostics are separate modules in both main crates.
@@ -135,7 +141,10 @@ not count; all other physical lines do, including comments and blank lines.
 
 **No argument-count escape hatch.** `#[allow(clippy::too_many_arguments)]` is
 forbidden. Every crate root carries `#![forbid(clippy::too_many_arguments)]`; because
-it is `forbid`, an inner `allow` is a compile error, not just a lint. A function that
+it is `forbid`, an inner `allow` is a compile error, not just a lint. The single
+exception is `netmeasure-cli` (above), which has `deny`; there, and everywhere else,
+`cargo xtask line-limit` rejects any hand-written `allow`, `expect` or `warn` of the
+lint or of the groups containing it (`clippy::complexity`, `clippy::all`). A function that
 would exceed clippy's limit (7) takes a context struct instead (e.g. `ProbeCtx`,
 `CycleCtx`, `ReportCtx`), named after what it groups rather than `Params`.
 
@@ -200,7 +209,10 @@ crates/k8s-netmeasure/src/
     listen.rs, run.rs, report.rs, selftest.rs, probe.rs
   output.rs          atomic file write
 
-xtask/src/           cargo xtask line-limit | coverage | audit (§12)
+crates/netmeasure-cli/src/
+  lib.rs             clap derive types, env-name rule, config-surface check (§9.1)
+
+xtask/src/           cargo xtask fmt | clippy | line-limit | test | deny | audit | coverage | ci | musl (§12)
 ```
 
 The allocator does not change the measurement: the measuring thread does not allocate

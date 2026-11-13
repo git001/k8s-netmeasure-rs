@@ -1,0 +1,15 @@
+# Major versions of crates and every GitHub Action update (design §1, §12).
+# Minor and patch crate updates come from the weekly freshness job instead.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -1,0 +1,20 @@
+[package]
+name = "k8s-netmeasure"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Reproducible TCP connect-latency measurement in Kubernetes and OpenShift"
+
+[dependencies]
+clap.workspace = true
+netmeasure-cli.workspace = true
+mimalloc.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+
+[lints]
+workspace = true

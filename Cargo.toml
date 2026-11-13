@@ -1,0 +1,50 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/netmeasure-util",
+    "crates/netmeasure-core",
+    "crates/netmeasure-cli",
+    "crates/k8s-netmeasure",
+    "xtask",
+]
+default-members = [
+    "crates/netmeasure-util",
+    "crates/netmeasure-core",
+    "crates/netmeasure-cli",
+    "crates/k8s-netmeasure",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.100"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/git001/k8s-netmeasure-rs"
+publish = false
+
+# Versions resolved 2026-11-13: newest releases, `cargo tree -d` empty (design §1).
+# A crate is listed here only once it is used; versions for later milestones are in
+# the design table and are re-resolved when they are added.
+[workspace.dependencies]
+netmeasure-cli = { path = "crates/netmeasure-cli" }
+clap = { version = "4.6.7", features = ["derive", "env"] }
+mimalloc = "0.1.52"
+assert_cmd = "2.2.2"
+jiff = { version = "0.2.43", default-features = false, features = ["std"] }
+serde_json = "1.0.154"
+syn = { version = "3.0.10", features = ["full"] }
+proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+# Design §2: never allowed, never raised; use a context struct instead. `deny` here,
+# `forbid` in every crate root except netmeasure-cli (clap derive, see its lib.rs);
+# `cargo xtask line-limit` rejects any hand-written allow.
+too_many_arguments = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "unwind"

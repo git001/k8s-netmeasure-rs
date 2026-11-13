@@ -1,0 +1,10 @@
+# Only what the build needs. local/ is confidential and must never enter an image.
+*
+!Cargo.toml
+!Cargo.lock
+!rust-toolchain.toml
+!.cargo/
+!crates/
+!xtask/
+!LICENSE-MIT
+!LICENSE-APACHE

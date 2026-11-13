@@ -146,12 +146,12 @@ Actions, since the repository is on GitHub). The workflow logic lives in Rust in
 | Format | `cargo fmt --check` | any diff |
 | Lint | `cargo clippy --all-targets -- -D warnings` | any warning |
 | File size | `cargo xtask line-limit` | any `.rs` file > 400 lines, or > 200 lines without a `//! line-limit: <reason>` line, counted outside `#[cfg(test)]` items (§2). Parsed with `syn`, so test modules are recognised exactly rather than by a line pattern |
-| Argument count | `#![forbid(clippy::too_many_arguments)]` in every crate root; `cargo xtask line-limit` also checks that no `clippy.toml` / `.clippy.toml` raises `too-many-arguments-threshold` | any function over the limit (7); any attempt to `allow` it or to raise the threshold |
+| Argument count | `#![forbid(clippy::too_many_arguments)]` in every crate root (`deny` in `netmeasure-cli`, §2); `cargo xtask line-limit` checks the crate roots, rejects any `allow`/`expect`/`warn` of the lint or of `clippy::complexity` / `clippy::all`, and checks that no `clippy.toml` / `.clippy.toml` raises `too-many-arguments-threshold` | any function over the limit (7); any attempt to `allow` it or to raise the threshold |
 | Config surface | unit test over the clap command tree (§9.1) | a parameter without env var, a misnamed env var, a missing unknown-env check, or a parameter set via CLI and env that is not rejected |
 | Tests | `cargo test --locked` (unit + integration, loopback only, reduced simulation grid) | any failure |
 | Simulation | full statistics simulation grid (§11), weekly | any acceptance criterion missed |
-| musl artifact | `cargo build --release --target x86_64-unknown-linux-musl` on the runner with `musl-tools`, then the test suite against it (§1) | build or test failure |
-| Coverage | `cargo llvm-cov` (lcov + HTML report as CI artifact) | line coverage below **90 %** in `netmeasure-core` and `netmeasure-util`, or below **70 %** in `k8s-netmeasure` |
+| musl artifact | `cargo xtask musl`: `cargo build --release --target x86_64-unknown-linux-musl` on the runner with `musl-tools`, then the test suite against it (§1); not part of `cargo xtask ci`, because it needs `musl-gcc` | build or test failure |
+| Coverage | `cargo llvm-cov` (lcov + HTML report as CI artifact) | line coverage below **90 %** in `netmeasure-core`, `netmeasure-util` and `netmeasure-cli`, or below **70 %** in `k8s-netmeasure` |
 | Audit | `cargo audit` (RustSec advisory DB) | any unignored advisory; also runs on a daily schedule, so new advisories against unchanged code are caught |
 | Dependency policy | `cargo deny check` (advisories, licenses, bans, sources) | license outside the allowlist (MIT, Apache-2.0, BSD-2/3-Clause, ISC, Unicode-3.0, Zlib), crate from a source other than crates.io, duplicate version of a **direct** dependency, or an unlisted transitive duplicate. Listed transitive exceptions (`skip` with reason and review date) are allowed; an exception past its review date fails |
 | Freshness | weekly scheduled job: `cargo update` + full gate run; Dependabot for major versions | the updated graph fails a gate; the job then opens an issue |

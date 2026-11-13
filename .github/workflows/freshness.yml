@@ -1,0 +1,32 @@
+# Weekly: newest compatible versions of every dependency, then the full gate run
+# (design §1, §12). A failure opens an issue. Major versions come via Dependabot.
+name: freshness
+
+on:
+  schedule:
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  update-and-gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-deny@0.20.2,cargo-audit@0.22.2,cargo-llvm-cov@0.9.1
+      - run: cargo update
+      - run: git diff --stat Cargo.lock
+      - run: cargo xtask ci
+      - name: Open an issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "Weekly dependency update fails a gate ($(date -u +%F))" \
+            --body "The freshness job ran \`cargo update\` and a gate failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
