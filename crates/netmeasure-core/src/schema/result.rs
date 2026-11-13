@@ -6,7 +6,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use super::control::{BuildInfo, NodeContext};
-pub use super::cycle::{CpuDelta, Cycle, Quality, Quantiles, Validity};
+pub use super::cycle::{CpuDelta, Cycle, ListenerDrops, Quality, Quantiles, Validity};
+pub use super::diagnostics::{CycleDiagnostics, Diagnostics, SourceDiagnostics, TargetDiagnostics};
 
 pub const SCHEMA: &str = "k8s-netmeasure/result";
 pub const SCHEMA_VERSION: u32 = 1;
@@ -21,27 +22,6 @@ pub struct ResultFile {
     pub targets: Vec<Target>,
     pub measurement: Measurement,
     pub diagnostics: Diagnostics,
-}
-
-/// Context that can explain a change but never decides one (§5).
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Diagnostics {
-    pub cycles: Vec<CycleDiagnostics>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct CycleDiagnostics {
-    pub cycle_id: String,
-    pub source: SourceDiagnostics,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct SourceDiagnostics {
-    /// `/proc/net/netstat` counters that increased during the cycle.
-    pub netstat: BTreeMap<String, u64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -114,6 +94,8 @@ pub struct Config {
     pub topology: String,
     /// `--no-cgroup-check`: throttling is not checked, every cycle is annotated.
     pub no_cgroup_check: bool,
+    /// `--target-control-port`; `None` with `--no-target-control`.
+    pub target_control_port: Option<u16>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -132,6 +114,13 @@ pub struct Target {
     pub addr: String,
     /// `loopback` or `listener`.
     pub kind: String,
+    /// Control port (`<ip>:<port>`); `None` for the loopback control and with
+    /// `--no-target-control`.
+    pub control: Option<String>,
+    /// From `/v1/info` at start; a different value later means the target restarted.
+    pub listener_instance: Option<String>,
+    pub context_before: Option<NodeContext>,
+    pub context_after: Option<NodeContext>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

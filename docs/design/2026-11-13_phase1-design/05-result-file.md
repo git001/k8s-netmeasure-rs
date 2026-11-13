@@ -79,8 +79,14 @@ formatter. Atomic write: `<path>.tmp-<run_id>` → `fsync` → `rename` → `fsy
   `adjtimex()`, for which `nix` has no safe wrapper, i.e. a further `unsafe` call,
   for a diagnostic hint only. Durations never depend on the wall clock (monotonic
   only); `report` names a possible clock error without knowing the NTP state (§10.6).
-Fields of later steps (`control`, `load`, `shutdown_deadline_ns`, target contexts and
-target diagnostics) are added with them (3d, 3e, milestone 6).
+- milestone 3d: per target `control`, `listener_instance`, `context_before` and
+  `context_after`; `config.target_control_port`; per cycle
+  `quality.listener_drops` as `{ "source": …, "targets": { "1": … } }` as in the
+  example above; `diagnostics.cycles[].targets` with the deltas of `accepted`,
+  `aborted`, `netns_listen_drops` and `netns_listen_overflows` per target. A target's
+  `name` is its declared node name if it has one, else its address.
+Fields of later steps (`control`, `load`, `shutdown_deadline_ns`) are added with them
+(3e, milestone 6).
 
 The file has three parts: **measurement** (samples plus the inputs to the validity
 decision), **diagnostics** (context that can explain a change but never decides one),

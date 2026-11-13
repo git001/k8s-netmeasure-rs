@@ -6,10 +6,13 @@ use std::collections::BTreeMap;
 
 use netmeasure_core::diag::cgroup::{ancestor_throttling, floor_millicores};
 use netmeasure_core::measure::validity::SideCounters;
+use netmeasure_core::schema::control::Snapshot;
 use netmeasure_core::schema::nic::NicPath;
 use netmeasure_core::schema::result::CgroupCheck;
 use netmeasure_core::schema::sourced::Sourced;
 
+use super::remote::{self, Remote};
+use crate::control::client::Client;
 use crate::diag::{cgroup, context, net};
 use crate::listener::Handle;
 
@@ -17,9 +20,11 @@ pub struct Snap {
     pub counters: SideCounters,
     pub netstat: BTreeMap<String, u64>,
     pub nic: Sourced<NicPath>,
+    /// One per target with a control port; `None` where it did not answer.
+    pub targets: Vec<Option<Snapshot>>,
 }
 
-pub fn take(listener: &Handle) -> Snap {
+pub fn take(listener: &Handle, client: &mut Client, remotes: &[Remote]) -> Snap {
     let cg = cgroup::read();
     let throttled = |l: &cgroup::Level| l.cpu_stat.map(|s| s.throttled_usec);
     let limited: Vec<u64> = cg
@@ -39,6 +44,7 @@ pub fn take(listener: &Handle) -> Snap {
         },
         netstat,
         nic: context::nic_path(),
+        targets: remote::snapshots(client, remotes),
     }
 }
 

@@ -1,6 +1,7 @@
 //! Cycle validity (design §3.6) from facts the binary collected around the cycle.
-//! Reasons invalidate a cycle; annotations only explain it. Target-side rules
-//! (`target_set_changed`, target listener drops) follow in milestone 3d.
+//! Reasons invalidate a cycle; annotations only explain it. The listener-drop and
+//! NIC-path rules apply to the measuring side and to every target with a control
+//! port alike.
 
 use crate::schema::nic::NicPath;
 use crate::schema::result::Validity;
@@ -44,6 +45,23 @@ pub struct CycleFacts {
     pub nic_after: Sourced<NicPath>,
     /// The NIC path of the run's first cycle.
     pub nic_first: Option<NicPath>,
+    /// Targets with a control port.
+    pub targets: Vec<TargetCycle>,
+    /// `--no-target-control`: the target side is not checked.
+    pub targets_unchecked: bool,
+}
+
+/// One target's control-port view of a cycle.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TargetCycle {
+    /// Counters before and after; `None` if the control port did not answer.
+    pub before: Option<SideCounters>,
+    pub after: Option<SideCounters>,
+    /// `listener_instance` and `boot_id` still those seen at the start of the run.
+    pub same_identity: bool,
+    pub nic_before: Sourced<NicPath>,
+    pub nic_after: Sourced<NicPath>,
+    pub nic_first: Option<NicPath>,
 }
 
 /// `after − before`; `None` if either is unknown or the counter went backwards.
@@ -64,25 +82,35 @@ pub fn evaluate(f: &CycleFacts) -> Validity {
     if f.cgroup_unchecked {
         notes.push("cpu_throttle_unchecked");
     }
-    let netns = delta(b.netns_listen_drops, a.netns_listen_drops).unwrap_or(0)
-        + delta(b.netns_listen_overflows, a.netns_listen_overflows).unwrap_or(0);
-    match delta(b.sk_drops, a.sk_drops) {
-        Some(d) if d > 0 => reasons.push("listener_drops"),
-        Some(_) if netns > 0 => notes.push("netns_listen_drops"),
-        Some(_) => {}
-        None if netns > 0 => reasons.push("listener_drops_suspected"),
-        None => {}
+    listener_rule(b, a, &mut reasons, &mut notes);
+    for t in &f.targets {
+        match (&t.before, &t.after) {
+            (Some(tb), Some(ta)) if t.same_identity => {
+                listener_rule(tb, ta, &mut reasons, &mut notes)
+            }
+            _ => reasons.push("target_set_changed"),
+        }
+        nic_rule(
+            &t.nic_before,
+            &t.nic_after,
+            t.nic_first.as_ref(),
+            &mut reasons,
+            &mut notes,
+        );
+    }
+    if f.targets_unchecked {
+        notes.push("target_unchecked");
     }
     if f.recorded < f.planned_slots || f.invalid_samples > 0 {
         reasons.push("sample_count_short");
     }
-    match (&f.nic_before.value, &f.nic_after.value) {
-        (Some(before), Some(after)) if before != after || f.nic_first.as_ref() != Some(before) => {
-            reasons.push("nic_changed");
-        }
-        (Some(_), Some(_)) => {}
-        _ => notes.push("nic_path_unknown"),
-    }
+    nic_rule(
+        &f.nic_before,
+        &f.nic_after,
+        f.nic_first.as_ref(),
+        &mut reasons,
+        &mut notes,
+    );
     if f.interrupted {
         reasons.push("interrupted");
     }
@@ -94,10 +122,62 @@ pub fn evaluate(f: &CycleFacts) -> Validity {
     if f.recorded > 0 && f.overruns as f64 / f.recorded as f64 > OVERRUN_FRACTION {
         notes.push("pacing_overrun");
     }
+    reasons.dedup_unsorted();
+    notes.dedup_unsorted();
     Validity {
         valid: reasons.is_empty(),
         reasons: reasons.into_iter().map(str::to_owned).collect(),
         annotations: notes.into_iter().map(str::to_owned).collect(),
+    }
+}
+
+/// Own `SK_MEMINFO_DROPS` decides; netns counters only as fallback or annotation.
+fn listener_rule(
+    b: &SideCounters,
+    a: &SideCounters,
+    reasons: &mut Vec<&str>,
+    notes: &mut Vec<&str>,
+) {
+    let netns = delta(b.netns_listen_drops, a.netns_listen_drops).unwrap_or(0)
+        + delta(b.netns_listen_overflows, a.netns_listen_overflows).unwrap_or(0);
+    match delta(b.sk_drops, a.sk_drops) {
+        Some(d) if d > 0 => reasons.push("listener_drops"),
+        Some(_) if netns > 0 => notes.push("netns_listen_drops"),
+        Some(_) => {}
+        None if netns > 0 => reasons.push("listener_drops_suspected"),
+        None => {}
+    }
+}
+
+/// Changed between before and after, or against the run's first cycle; never
+/// "unchanged" when unobserved.
+fn nic_rule(
+    before: &Sourced<NicPath>,
+    after: &Sourced<NicPath>,
+    first: Option<&NicPath>,
+    reasons: &mut Vec<&str>,
+    notes: &mut Vec<&str>,
+) {
+    match (&before.value, &after.value) {
+        (Some(b), Some(a)) if b != a || first != Some(b) => reasons.push("nic_changed"),
+        (Some(_), Some(_)) => {}
+        _ => notes.push("nic_path_unknown"),
+    }
+}
+
+/// Keeps the first occurrence of each entry, in order.
+trait DedupUnsorted {
+    fn dedup_unsorted(&mut self);
+}
+
+impl DedupUnsorted for Vec<&str> {
+    fn dedup_unsorted(&mut self) {
+        let mut seen = Vec::new();
+        self.retain(|s| {
+            let new = !seen.contains(s);
+            seen.push(*s);
+            new
+        });
     }
 }
 
@@ -142,7 +222,64 @@ mod tests {
             nic_before: Sourced::observed(Some(nic("a"))),
             nic_after: Sourced::observed(Some(nic("a"))),
             nic_first: Some(nic("a")),
+            targets: vec![],
+            targets_unchecked: false,
         }
+    }
+
+    fn target() -> TargetCycle {
+        TargetCycle {
+            before: Some(counters(0, 0, 0)),
+            after: Some(counters(0, 0, 0)),
+            same_identity: true,
+            nic_before: Sourced::unknown(),
+            nic_after: Sourced::unknown(),
+            nic_first: None,
+        }
+    }
+
+    #[test]
+    fn target_rules() {
+        let ok = CycleFacts {
+            targets: vec![target(), target()],
+            ..facts()
+        };
+        let v = evaluate(&ok);
+        assert!(v.valid);
+        assert_eq!(
+            v.annotations,
+            vec!["nic_path_unknown"],
+            "listed once for two targets"
+        );
+        let restarted = CycleFacts {
+            targets: vec![TargetCycle {
+                same_identity: false,
+                ..target()
+            }],
+            ..facts()
+        };
+        assert_eq!(evaluate(&restarted).reasons, vec!["target_set_changed"]);
+        let gone = CycleFacts {
+            targets: vec![TargetCycle {
+                after: None,
+                ..target()
+            }],
+            ..facts()
+        };
+        assert_eq!(evaluate(&gone).reasons, vec!["target_set_changed"]);
+        let drops = CycleFacts {
+            targets: vec![TargetCycle {
+                after: Some(counters(0, 1, 0)),
+                ..target()
+            }],
+            ..facts()
+        };
+        assert_eq!(evaluate(&drops).reasons, vec!["listener_drops"]);
+        let unchecked = CycleFacts {
+            targets_unchecked: true,
+            ..facts()
+        };
+        assert_eq!(evaluate(&unchecked).annotations, vec!["target_unchecked"]);
     }
 
     #[test]

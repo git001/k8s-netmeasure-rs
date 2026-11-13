@@ -7,10 +7,11 @@ use netmeasure_core::measure::record::flag;
 use netmeasure_core::measure::validity::{self, CycleFacts, delta};
 use netmeasure_core::schema::nic::NicPath;
 use netmeasure_core::schema::result::{
-    CpuDelta, Cycle, CycleDiagnostics, Quality, Quantiles, SourceDiagnostics, Target,
+    CpuDelta, Cycle, CycleDiagnostics, ListenerDrops, Quality, Quantiles, SourceDiagnostics, Target,
 };
 use netmeasure_core::stats::quantile::type1;
 
+use super::remote::{self, Remote};
 use super::snapshot::Snap;
 use super::worker::CycleRun;
 
@@ -26,6 +27,10 @@ pub struct Done<'a> {
     pub after: &'a Snap,
     pub nic_first: Option<&'a NicPath>,
     pub cgroup_unchecked: bool,
+    pub remotes: &'a [Remote],
+    /// NIC path of every remote in the run's first cycle.
+    pub remote_nic_first: &'a [Option<NicPath>],
+    pub targets_unchecked: bool,
 }
 
 /// The cycle record and its diagnostics entry.
@@ -51,7 +56,20 @@ pub fn record(d: Done<'_>) -> (Cycle, CycleDiagnostics) {
         nic_before: d.before.nic.clone(),
         nic_after: d.after.nic.clone(),
         nic_first: d.nic_first.cloned(),
+        targets: d
+            .remotes
+            .iter()
+            .enumerate()
+            .map(|(i, r)| {
+                let (b, a) = (d.before.targets[i].as_ref(), d.after.targets[i].as_ref());
+                remote::cycle(r, b, a, d.remote_nic_first[i].as_ref())
+            })
+            .collect(),
+        targets_unchecked: d.targets_unchecked,
     });
+    let (target_diag, target_drops): (Vec<_>, Vec<_>) = (0..d.remotes.len())
+        .map(|i| remote::diagnostics(d.before.targets[i].as_ref(), d.after.targets[i].as_ref()))
+        .unzip();
     let (b, a) = (&d.before.counters, &d.after.counters);
     let cycle_id = ulid::Ulid::generate().to_string();
     let diagnostics = CycleDiagnostics {
@@ -59,6 +77,7 @@ pub fn record(d: Done<'_>) -> (Cycle, CycleDiagnostics) {
         source: SourceDiagnostics {
             netstat: netstat::delta(&d.before.netstat, &d.after.netstat),
         },
+        targets: remote::by_index(d.remotes, target_diag),
     };
     let cycle = Cycle {
         cycle_id,
@@ -79,7 +98,10 @@ pub fn record(d: Done<'_>) -> (Cycle, CycleDiagnostics) {
                     a.ancestors_throttled_usec,
                 ),
             },
-            listener_drops: delta(b.sk_drops, a.sk_drops),
+            listener_drops: ListenerDrops {
+                source: delta(b.sk_drops, a.sk_drops),
+                targets: remote::by_index(d.remotes, target_drops),
+            },
         },
     };
     (cycle, diagnostics)

@@ -39,6 +39,7 @@ fn complete_run_counts_samples_per_target() {
         "--path",
         "overlay",
         "--no-cgroup-check",
+        "--no-target-control",
     ];
     bin().args(args).assert().code(0);
     let r = read(&out);
@@ -78,7 +79,12 @@ fn complete_run_counts_samples_per_target() {
                 .annotations
                 .contains(&"cpu_throttle_unchecked".to_owned())
         );
-        assert_eq!(c.quality.listener_drops, Some(0));
+        assert_eq!(c.quality.listener_drops.source, Some(0));
+        assert!(
+            c.validity
+                .annotations
+                .contains(&"target_unchecked".to_owned())
+        );
     }
     assert_eq!(r.diagnostics.cycles.len(), r.measurement.cycles.len());
     assert!(
@@ -103,6 +109,8 @@ fn sigterm_writes_an_interrupted_file_and_exits_143() {
         "--output",
         out.to_str().unwrap(),
         "--no-cgroup-check",
+        "--target-control-port",
+        common::listen::port(&l.control),
     ]);
     std::thread::sleep(Duration::from_millis(800));
     let started = Instant::now();

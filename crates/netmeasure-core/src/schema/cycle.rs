@@ -1,6 +1,8 @@
 //! One measurement cycle in the result file (design §3.5, §3.6, §5): sample range,
 //! timing, validity and the quality figures behind it.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -28,15 +30,23 @@ pub struct Validity {
     pub annotations: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Quality {
     pub wake_lateness_ns: Quantiles,
     pub overruns: u64,
     pub cpu: CpuDelta,
-    /// `SK_MEMINFO_DROPS` delta of the own loopback control listener (target listeners
-    /// follow with their control ports).
-    pub listener_drops: Option<u64>,
+    pub listener_drops: ListenerDrops,
+}
+
+/// `SK_MEMINFO_DROPS` deltas during the cycle; `None` if unreadable or unreachable.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ListenerDrops {
+    /// The own loopback control listener.
+    pub source: Option<u64>,
+    /// Target index (as in the `target` column) → delta; targets with a control port.
+    pub targets: BTreeMap<String, Option<u64>>,
 }
 
 /// Throttling during the cycle; `None` if unreadable or unchecked.

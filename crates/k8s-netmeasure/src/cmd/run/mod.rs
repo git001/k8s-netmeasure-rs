@@ -6,6 +6,7 @@
 
 mod cycle;
 mod file;
+mod remote;
 mod session;
 mod setup;
 mod snapshot;
@@ -16,11 +17,12 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 use std::process::ExitCode;
 
 use netmeasure_cli::RunArgs;
-use netmeasure_core::schema::result::{Clock, Config, RunStatus};
+use netmeasure_core::schema::result::{Clock, RunStatus};
 use netmeasure_util::time::{as_nanos_u64, rfc3339_ns};
 
 use self::session::Session;
 use self::worker::Worker;
+use crate::control::client::Client;
 use crate::diag::context::{self, Declared};
 use crate::exit;
 use crate::listener::Listener;
@@ -54,6 +56,30 @@ pub fn run(args: &RunArgs, sources: &BTreeMap<String, &'static str>) -> ExitCode
             );
         }
     };
+    let mut client = match Client::new() {
+        Ok(c) => c,
+        Err(e) => {
+            return refuse(
+                exit::INTERNAL,
+                "cannot start the control client",
+                &e.to_string(),
+            );
+        }
+    };
+    let remotes = if args.no_target_control {
+        Vec::new()
+    } else {
+        match remote::connect(&mut client, &args.target, args.target_control_port) {
+            Ok(r) => r,
+            Err(e) => {
+                return refuse(
+                    exit::REFUSED,
+                    "target control port check failed (use --no-target-control for targets without one)",
+                    &e,
+                );
+            }
+        }
+    };
     let lo = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0);
     let listener = match Listener::start(lo, args.backlog) {
         Ok(l) => l,
@@ -68,7 +94,7 @@ pub fn run(args: &RunArgs, sources: &BTreeMap<String, &'static str>) -> ExitCode
     let declared = Declared::from_args(&args.context);
     let context_before = context::read_context(&declared);
     let (path, path_source) = setup::path(args, context_before.nic.value.is_some());
-    let targets = setup::targets(args, &listener.local.to_string());
+    let mut targets = setup::targets(args, &listener.local.to_string(), &remotes);
     let run_id = ulid::Ulid::generate().to_string();
     let (origin_ns, origin_wall) = (time::monotonic_ns(), time::realtime_ns());
     let wall = |mono: u64| rfc3339_ns(origin_wall + i128::from(mono.saturating_sub(origin_ns)));
@@ -96,12 +122,18 @@ pub fn run(args: &RunArgs, sources: &BTreeMap<String, &'static str>) -> ExitCode
             outlier_ns: as_nanos_u64(args.outlier_threshold),
             cgroup_unchecked: args.no_cgroup_check,
             listener: listener.handle(),
+            remotes: &remotes,
+            targets_unchecked: args.no_target_control,
             shutdown: &shutdown,
             origin_ns,
             wall: &wall,
         },
+        &mut client,
         worker,
     );
+    for r in &remotes {
+        targets[usize::from(r.index)].context_after = remote::context_after(&mut client, r);
+    }
     drop(listener);
 
     let signal = shutdown.requested();
@@ -121,26 +153,7 @@ pub fn run(args: &RunArgs, sources: &BTreeMap<String, &'static str>) -> ExitCode
             boot_id: context_before.boot_id.value.clone(),
         },
         labels: setup.labels.clone(),
-        config: Config {
-            samples: args.samples,
-            warmup: args.warmup,
-            interval_ns: as_nanos_u64(args.interval),
-            loopback_every: args.loopback_every,
-            cycles: setup.cycle_slots.len() as u64,
-            cycle_slots: setup.cycle_slots.clone(),
-            timeout_ns: as_nanos_u64(args.timeout),
-            outlier_threshold_ns: as_nanos_u64(args.outlier_threshold),
-            listener: targets[0].addr.clone(),
-            path,
-            path_source,
-            topology: if args.target.len() == 1 {
-                "pair"
-            } else {
-                "sampled"
-            }
-            .into(),
-            no_cgroup_check: args.no_cgroup_check,
-        },
+        config: setup::config(args, &setup, &targets[0].addr, path, path_source),
         config_source: sources
             .iter()
             .map(|(k, v)| (k.clone(), (*v).to_owned()))

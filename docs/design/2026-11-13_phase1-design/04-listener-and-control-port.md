@@ -132,6 +132,13 @@ port, one protocol**. That matches the prompt's "`/ready` next to `/metrics`".
     out of rotation within one period.
 
   All probes use `timeoutSeconds: 2`.
+- **Where `run` finds a target's control port** (decided in milestone 3d): at the
+  target's IP and `--target-control-port` (default 17701), the same for every
+  target. At start `run` reads `/v1/info` and `/v1/context` of every target; a target
+  that does not answer refuses the start (exit 3), because without it the
+  target-side rules cannot be checked. `--no-target-control` measures plain TCP
+  targets without a control port (e.g. a node's kubelet); the target-side rules are
+  then not checked and every cycle is annotated `target_unchecked`.
 - `run` keeps one HTTP keep-alive connection per target for the duration of the run.
   If a request fails and a reconnect fails too, the result is `target_set_changed`.
   Timeouts: 2 s per request.

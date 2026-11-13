@@ -1,8 +1,10 @@
-//! The control port (design §7): HTTP/1.1 + JSON on a dedicated `control` thread with
-//! a `current_thread` tokio runtime and hyper. The measuring and accept threads never
+//! The control port (design §7): HTTP/1.1 + JSON. The server runs on a dedicated
+//! `control` thread with a `current_thread` tokio runtime and hyper; the client
+//! (`run`) on the main thread. The measuring and accept threads never
 //! touch tokio. The socket is bound synchronously, so a bind failure is reported
 //! before the thread starts (exit 3).
 
+pub mod client;
 mod routes;
 pub mod state;
 

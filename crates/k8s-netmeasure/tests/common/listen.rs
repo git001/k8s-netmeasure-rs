@@ -54,6 +54,11 @@ pub fn start_with(extra: &[&str]) -> Running {
     }
 }
 
+/// The port of an `<ip>:<port>` string.
+pub fn port(addr: &str) -> &str {
+    addr.rsplit(':').next().unwrap()
+}
+
 /// Sends `signal` and returns the exit code and the combined output.
 pub fn stop_with(mut child: Child, signal: Signal) -> (i32, String) {
     kill(Pid::from_raw(child.id() as i32), signal).unwrap();

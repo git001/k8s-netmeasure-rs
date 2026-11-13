@@ -5,11 +5,14 @@
 use std::sync::mpsc;
 
 use netmeasure_core::measure::record::Sample;
+use netmeasure_core::schema::nic::NicPath;
 use netmeasure_core::schema::result::{Cycle, CycleDiagnostics, Target};
 
+use super::remote::Remote;
 use super::snapshot::{self, Snap};
 use super::worker::{CycleRun, Job, Worker};
 use super::{cycle, setup::Setup};
+use crate::control::client::Client;
 use crate::listener::Handle;
 use crate::measure::thread;
 use crate::shutdown::Shutdown;
@@ -22,6 +25,8 @@ pub struct Session<'a> {
     pub outlier_ns: u64,
     pub cgroup_unchecked: bool,
     pub listener: Handle,
+    pub remotes: &'a [Remote],
+    pub targets_unchecked: bool,
     pub shutdown: &'a Shutdown,
     pub origin_ns: u64,
     /// Monotonic ns → RFC 3339.
@@ -35,7 +40,7 @@ pub struct Outcome {
     pub samples: Vec<Sample>,
 }
 
-pub fn measure(s: &Session<'_>, worker: Worker) -> Outcome {
+pub fn measure(s: &Session<'_>, client: &mut Client, worker: Worker) -> Outcome {
     let (job_tx, job_rx) = mpsc::channel::<Job>();
     let (done_tx, done_rx) = mpsc::channel::<CycleRun>();
     let mut worker = worker;
@@ -48,20 +53,24 @@ pub fn measure(s: &Session<'_>, worker: Worker) -> Outcome {
     });
     let mut out = Outcome::default();
     let (mut first_slot, mut nic_first) = (0, None);
+    let mut remote_nic_first = vec![None; s.remotes.len()];
     for (index, &slots) in s.setup.cycle_slots.iter().enumerate() {
         if s.shutdown.requested().is_some() {
             break;
         }
-        let before = snapshot::take(&s.listener);
+        let before = snapshot::take(&s.listener, client, s.remotes);
         let started = time::monotonic_ns();
         if job_tx.send(Job { first_slot, slots }).is_err() {
             break;
         }
         let Ok(run) = done_rx.recv() else { break };
         let ended = time::monotonic_ns();
-        let after = snapshot::take(&s.listener);
+        let after = snapshot::take(&s.listener, client, s.remotes);
         if index == 0 {
             nic_first = before.nic.value.clone();
+            for (first, snap) in remote_nic_first.iter_mut().zip(&before.targets) {
+                *first = snap.as_ref().and_then(|t| t.nic.value.clone());
+            }
         }
         let (c, diag) = record(
             s,
@@ -75,7 +84,7 @@ pub fn measure(s: &Session<'_>, worker: Worker) -> Outcome {
             &run,
             &before,
             &after,
-            nic_first.as_ref(),
+            (nic_first.as_ref(), &remote_nic_first),
         );
         cycle::log(&c, &run, s.targets, s.path, s.outlier_ns);
         first_slot += slots;
@@ -105,7 +114,7 @@ fn record(
     run: &CycleRun,
     before: &Snap,
     after: &Snap,
-    nic_first: Option<&netmeasure_core::schema::nic::NicPath>,
+    (nic_first, remote_nic_first): (Option<&NicPath>, &[Option<NicPath>]),
 ) -> (Cycle, CycleDiagnostics) {
     cycle::record(cycle::Done {
         index: c.index as u64,
@@ -119,5 +128,8 @@ fn record(
         after,
         nic_first,
         cgroup_unchecked: s.cgroup_unchecked,
+        remotes: s.remotes,
+        remote_nic_first,
+        targets_unchecked: s.targets_unchecked,
     })
 }

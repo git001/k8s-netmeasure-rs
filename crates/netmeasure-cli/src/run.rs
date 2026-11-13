@@ -1,5 +1,5 @@
-//! `run` arguments (design §3.4, §3.5, §3.7, §5, §9). Target control ports,
-//! `--node-context-from` and the shutdown deadline follow in milestones 3d and 3e;
+//! `run` arguments (design §3.4, §3.5, §3.7, §5, §7, §9). `--node-context-from` and
+//! the shutdown deadline follow in milestones 3d2 and 3e;
 //! background load in milestone 6.
 
 use std::net::SocketAddrV4;
@@ -24,6 +24,19 @@ pub struct RunArgs {
     /// One target is `pair` topology, several are `sampled`.
     #[arg(long, env = "K8S_NETMEASURE_TARGET", required = true, value_delimiter = ',', value_parser = ipv4_target)]
     pub target: Vec<SocketAddrV4>,
+
+    /// Control port of every target (same IP as the target). `run` reads each
+    /// target's identity, context and counters there before and after every cycle.
+    #[arg(long, env = "K8S_NETMEASURE_TARGET_CONTROL_PORT", default_value_t = 17701,
+          value_parser = clap::value_parser!(u16).range(1..))]
+    pub target_control_port: u16,
+
+    /// Targets have no control port (any TCP listener, e.g. a node's kubelet): the
+    /// target-side rules (listener drops, restarts, NIC path) are not checked and
+    /// every cycle is annotated `target_unchecked`.
+    #[arg(long, env = "K8S_NETMEASURE_NO_TARGET_CONTROL", action = clap::ArgAction::SetTrue,
+          value_parser = clap::builder::BoolValueParser::new(), conflicts_with = "target_control_port")]
+    pub no_target_control: bool,
 
     /// Counted samples per real target, after warm-up (1–1000000).
     #[arg(long, env = "K8S_NETMEASURE_SAMPLES", default_value_t = 5000,

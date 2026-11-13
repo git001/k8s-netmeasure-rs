@@ -3,6 +3,7 @@
 
 pub mod control;
 pub mod cycle;
+pub mod diagnostics;
 pub mod json;
 pub mod nic;
 pub mod result;

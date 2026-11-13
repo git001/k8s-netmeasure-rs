@@ -29,6 +29,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `run` against `listen` targets: the control port is the target's IP and
+  `--target-control-port` (default 17701); `/v1/info` and `/v1/context` at start
+  (no answer: exit 3), `/v1/snapshot` before and after every cycle over one
+  keep-alive connection per target (2 s timeout, one reconnect). New validity reason
+  `target_set_changed` (other `listener_instance` or `boot_id`, or unreachable);
+  target listener drops and target NIC path changes use the same rules as the
+  source. `--no-target-control` measures plain TCP targets and annotates every cycle
+  `target_unchecked`. Result file: per target control address, `listener_instance`
+  and context before/after; `quality.listener_drops` per side; target counter deltas
+  in `diagnostics`.
 - `run`, second part: snapshots before and after every cycle (own and visible
   ancestor cgroup throttling, loopback listener `SK_MEMINFO_DROPS`, netns
   `ListenDrops`/`ListenOverflows`, NIC path) with the validity reasons
