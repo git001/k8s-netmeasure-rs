@@ -13,6 +13,13 @@ pub fn monotonic_ns() -> u64 {
     (ts.tv_sec() as u64) * NS_PER_S + ts.tv_nsec() as u64
 }
 
+/// `CLOCK_REALTIME` in nanoseconds since the Unix epoch (wall clock, for timestamps
+/// only; never for durations).
+pub fn realtime_ns() -> i128 {
+    let ts = clock_gettime(ClockId::CLOCK_REALTIME).expect("CLOCK_REALTIME");
+    i128::from(ts.tv_sec()) * i128::from(NS_PER_S) + i128::from(ts.tv_nsec())
+}
+
 /// Nanoseconds as a `timespec`, for `ppoll` and `clock_nanosleep`.
 pub fn timespec(ns: u64) -> TimeSpec {
     TimeSpec::new((ns / NS_PER_S) as _, (ns % NS_PER_S) as _)

@@ -11,8 +11,6 @@ publish.workspace = true
 # errno constants only; core never calls into libc (design §2: no I/O).
 libc.workspace = true
 serde.workspace = true
-
-[dev-dependencies]
 serde_json.workspace = true
 
 [lints]

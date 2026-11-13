@@ -99,7 +99,7 @@ fn variable_of_another_subcommand_is_ignored_and_logged() {
     let e = stderr(&out);
     assert!(
         e.contains("\"variable\":\"K8S_NETMEASURE_OUTPUT\"")
-            && e.contains("\"belongs_to\":\"selftest\""),
+            && e.contains("\"belongs_to\":\"run,selftest\""),
         "{e}"
     );
 }

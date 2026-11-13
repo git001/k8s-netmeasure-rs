@@ -61,6 +61,19 @@ formatter. Atomic write: `<path>.tmp-<run_id>` → `fsync` → `rename` → `fsy
 }
 ```
 
+**Fields added in milestone 3c** (implementation detail, same schema version):
+- every cycle carries `start_offset_ns`, the monotonic offset of its first scheduled
+  slot from the run origin; slot `k` of the cycle is scheduled at
+  `start_offset_ns + k × interval`, and `reanchor.sched_offset_ns` is relative to the
+  cycle's start. Each cycle has its own pacing origin because the snapshots between
+  cycles take time;
+- `config.outlier_threshold_ns` (`--outlier-threshold`, §9.3);
+- `config.path_source` is `declared` with `--path`, otherwise `detected`: `underlay`
+  if a physical interface is visible in the network namespace, else `overlay`.
+Fields of later steps (`control`, `load`, `shutdown_deadline_ns`, `no_cgroup_check`,
+`clock.synchronized`, target contexts, `diagnostics`) are added with them (3c2–3e,
+milestone 6).
+
 The file has three parts: **measurement** (samples plus the inputs to the validity
 decision), **diagnostics** (context that can explain a change but never decides one),
 and header/context. This is the separation the prompt requires.

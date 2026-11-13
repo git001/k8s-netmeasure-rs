@@ -6,6 +6,12 @@ use std::io::Write;
 use std::path::Path;
 
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    write_atomic_as(path, bytes, &std::process::id().to_string())
+}
+
+/// Like [`write_atomic`]; the temporary file is `<name>.tmp-<tag>` next to the target
+/// (`run` passes its `run_id`, design §5).
+pub fn write_atomic_as(path: &Path, bytes: &[u8], tag: &str) -> std::io::Result<()> {
     let dir = path
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
@@ -13,11 +19,7 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let name = path
         .file_name()
         .ok_or_else(|| std::io::Error::other("output path has no file name"))?;
-    let tmp = dir.join(format!(
-        ".{}.tmp-{}",
-        name.to_string_lossy(),
-        std::process::id()
-    ));
+    let tmp = dir.join(format!("{}.tmp-{tag}", name.to_string_lossy()));
     let result = (|| {
         let mut f = std::fs::File::create(&tmp)?;
         f.write_all(bytes)?;

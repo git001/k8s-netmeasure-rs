@@ -21,6 +21,20 @@ pub struct Declared {
     pub instance_type: Option<String>,
 }
 
+impl Declared {
+    /// `--node-name`, else `$NODE_NAME` (Downward API), else unknown.
+    pub fn from_args(c: &netmeasure_cli::ContextArgs) -> Declared {
+        Declared {
+            node_name: c
+                .node_name
+                .clone()
+                .or_else(|| std::env::var("NODE_NAME").ok()),
+            zone: c.zone.clone(),
+            instance_type: c.instance_type.clone(),
+        }
+    }
+}
+
 pub fn read_context(declared: &Declared) -> NodeContext {
     let cpu = cpuinfo::parse(&read("/proc/cpuinfo").unwrap_or_default());
     let mtu =

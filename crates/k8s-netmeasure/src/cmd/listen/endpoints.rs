@@ -81,17 +81,8 @@ fn snapshot(handle: &Handle, instance: &str) -> Snapshot {
     }
 }
 
-/// `--node-name`, else `$NODE_NAME` (Downward API), else unknown.
 fn declared(args: &ListenArgs) -> Declared {
-    let c = &args.context;
-    Declared {
-        node_name: c
-            .node_name
-            .clone()
-            .or_else(|| std::env::var("NODE_NAME").ok()),
-        zone: c.zone.clone(),
-        instance_type: c.instance_type.clone(),
-    }
+    Declared::from_args(&args.context)
 }
 
 fn json<T: serde::Serialize>(value: &T) -> serde_json::Value {

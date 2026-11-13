@@ -7,6 +7,8 @@ pub const INTERNAL: u8 = 1;
 pub const USAGE: u8 = 2;
 /// Refused to start: a self-check or a bind failed.
 pub const REFUSED: u8 = 3;
+/// `run` completed, at least one cycle invalid.
+pub const INVALID_CYCLES: u8 = 4;
 pub const SELFTEST_INCOMPLETE: u8 = 6;
 pub const PROBE_NOT_OK: u8 = 7;
 

@@ -31,6 +31,14 @@ pub fn format_duration(d: Duration) -> String {
     }
 }
 
+/// UTC timestamp in RFC 3339 with nanoseconds, e.g. `2026-11-13T21:41:58.598879123Z`.
+pub fn rfc3339_ns(unix_ns: i128) -> String {
+    match jiff::Timestamp::from_nanosecond(unix_ns) {
+        Ok(t) => format!("{t:.9}"),
+        Err(_) => "invalid-time".to_owned(),
+    }
+}
+
 /// Nanoseconds as `u64`, saturating (≈ 584 years).
 pub fn as_nanos_u64(d: Duration) -> u64 {
     u64::try_from(d.as_nanos()).unwrap_or(u64::MAX)
@@ -39,6 +47,15 @@ pub fn as_nanos_u64(d: Duration) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rfc3339_with_nanoseconds() {
+        assert_eq!(
+            rfc3339_ns(1_000_000_000_123),
+            "1970-01-01T00:16:40.000000123Z"
+        );
+        assert_eq!(rfc3339_ns(i128::MAX), "invalid-time");
+    }
 
     #[test]
     fn parses_friendly_units() {

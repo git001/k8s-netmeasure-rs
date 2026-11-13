@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicI32, Ordering};
 
 use crate::sys::signals;
 
+#[derive(Clone)]
 pub struct Shutdown {
     signal: Arc<AtomicI32>,
 }

@@ -15,7 +15,17 @@ pub struct ThreadSetup {
 
 /// Runs `work` on a new measuring thread and waits for it.
 pub fn run<T: Send + 'static>(work: impl FnOnce(ThreadSetup) -> T + Send + 'static) -> T {
-    let handle = thread::Builder::new()
+    match spawn(work).join() {
+        Ok(v) => v,
+        Err(panic) => std::panic::resume_unwind(panic),
+    }
+}
+
+/// Starts `work` on a new measuring thread (for `run`, which talks to it per cycle).
+pub fn spawn<T: Send + 'static>(
+    work: impl FnOnce(ThreadSetup) -> T + Send + 'static,
+) -> thread::JoinHandle<T> {
+    thread::Builder::new()
         .name("measure".to_owned())
         .spawn(move || {
             let setup = ThreadSetup {
@@ -24,9 +34,5 @@ pub fn run<T: Send + 'static>(work: impl FnOnce(ThreadSetup) -> T + Send + 'stat
             };
             work(setup)
         })
-        .expect("spawning the measuring thread");
-    match handle.join() {
-        Ok(v) => v,
-        Err(panic) => std::panic::resume_unwind(panic),
-    }
+        .expect("spawning the measuring thread")
 }

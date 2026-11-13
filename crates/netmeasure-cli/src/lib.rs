@@ -11,10 +11,12 @@
 
 pub mod context;
 pub mod env;
+pub mod labels;
 pub mod listen;
 pub mod log;
 pub mod parse;
 pub mod probe;
+pub mod run;
 pub mod selftest;
 pub mod surface;
 
@@ -24,6 +26,7 @@ pub use crate::context::ContextArgs;
 pub use crate::listen::{ControlBind, ListenArgs};
 pub use crate::log::{LogArgs, LogLevel};
 pub use crate::probe::ProbeArgs;
+pub use crate::run::{PathKind, RunArgs};
 pub use crate::selftest::SelftestArgs;
 
 /// Environment variable prefix for every parameter (design §9.1).
@@ -57,6 +60,9 @@ pub enum Subcommands {
     /// Manual cross-check: a few connects with the measurement code path, one JSON
     /// line each. Not a measurement: no pacing, cycles or self-validation.
     Probe(ProbeArgs),
+    /// The measurement: paced connects to the targets and the own loopback control in
+    /// cycles, each validated, written to one result file.
+    Run(RunArgs),
     /// Verifies on this kernel what the measurement relies on: SYN retransmission
     /// field, listener drop counter, SYN backoff, loopback behaviour, pacing, cgroup
     /// and signal isolation.
@@ -69,6 +75,7 @@ impl Subcommands {
         match self {
             Subcommands::Listen(a) => &a.log,
             Subcommands::Probe(a) => &a.log,
+            Subcommands::Run(a) => &a.log,
             Subcommands::Selftest(a) => &a.log,
         }
     }

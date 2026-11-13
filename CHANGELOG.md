@@ -29,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `run` subcommand, first part: `--target` (repeatable), `--samples`, `--warmup`,
+  `--interval`, `--loopback-every`, `--cycles` / `--cycle` (effective cycle length
+  2–60 s), `--timeout`, `--outlier-threshold`, `--path` (else detected), `--label`,
+  `--backlog`, `--output`, declared context. Paced measuring thread with one job per
+  cycle, own loopback control listener, per-cycle validity (`sample_count_short`,
+  `interrupted`, annotations `scheduling_jitter`, `pacing_overrun`), one INFO log
+  line per cycle and target, WARN per outlier and invalid cycle. Result file
+  (`k8s-netmeasure/result`, schema 1) with header, node context before and after,
+  targets, cycles and compact sample columns, typed in
+  `netmeasure-core::schema::result`; written atomically via
+  `<output>.tmp-<run_id>`. Exit 0 / 4 / 143 / 130 (`interrupted` file).
 - Security warning for `listen` (minimal protection only, never expose it to the
   internet) in the README, in `listen --help` and as a WARN log line at every start.
 - `listen` control port: `GET /v1/context` (node context with provenance per field:
@@ -65,8 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--log-level` (`K8S_NETMEASURE_LOG_LEVEL`) on every subcommand: `error`, `warn`,
   `info` (default), `debug`, `trace`; `debug` logs parameter sources and full
   `selftest` check data.
-- Atomic result write: temporary file, `fsync`, `rename`, then `fsync` of the
-  directory (design §5), so a completed file also survives a node crash.
+- Atomic result write: temporary file `<name>.tmp-<tag>`, `fsync`, `rename`, then
+  `fsync` of the directory (design §5), so a completed file also survives a node crash.
 - `probe` subcommand: a few connects (`--count`, 1–100) to `--target` with the exact
   measurement code path; one JSON line per connect on stdout with outcome, duration,
   errno, `sync_connect`, SYN retransmissions. Exit 0 if every connect is `ok`, 7
