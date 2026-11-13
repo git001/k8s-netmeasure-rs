@@ -7,7 +7,8 @@ use netmeasure_core::measure::record::{self, Sample};
 use netmeasure_core::schema::control::NodeContext;
 use netmeasure_core::schema::json;
 use netmeasure_core::schema::result::{
-    self, Clock, Config, Cycle, Measurement, ResultFile, Run, RunStatus, SideContext, Target,
+    self, CgroupCheck, Clock, Config, Cycle, CycleDiagnostics, Diagnostics, Measurement,
+    ResultFile, Run, RunStatus, SideContext, Target,
 };
 
 use crate::build_info::BUILD_INFO;
@@ -23,11 +24,13 @@ pub struct Finished {
     pub labels: BTreeMap<String, String>,
     pub config: Config,
     pub config_source: BTreeMap<String, String>,
+    pub cgroup: CgroupCheck,
     pub context_before: NodeContext,
     pub context_after: Option<NodeContext>,
     pub targets: Vec<Target>,
     pub cycles: Vec<Cycle>,
     pub samples: Vec<Sample>,
+    pub diagnostics: Vec<CycleDiagnostics>,
 }
 
 pub fn write(path: &Path, f: Finished) -> std::io::Result<()> {
@@ -45,6 +48,7 @@ pub fn write(path: &Path, f: Finished) -> std::io::Result<()> {
             build_info: BUILD_INFO.schema(),
             config: f.config,
             config_source: f.config_source,
+            cgroup: f.cgroup,
         },
         source: SideContext {
             context_before: f.context_before,
@@ -54,6 +58,9 @@ pub fn write(path: &Path, f: Finished) -> std::io::Result<()> {
         measurement: Measurement {
             cycles: f.cycles,
             samples: record::columns(&f.samples),
+        },
+        diagnostics: Diagnostics {
+            cycles: f.diagnostics,
         },
     };
     let text = json::to_text(&doc).map_err(std::io::Error::other)?;

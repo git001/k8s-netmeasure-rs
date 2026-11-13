@@ -16,7 +16,7 @@ formatter. Atomic write: `<path>.tmp-<run_id>` → `fsync` → `rename` → `fsy
   "run": {
     "run_id": "01J…", "status": "complete" | "interrupted" | "failed",
     "started_at": "2026-…Z", "ended_at": "…Z",          // UTC, ns precision
-    "clock": { "realtime_at_origin": "…Z", "boot_id": "…", "synchronized": true },   // maps monotonic offsets to wall clock; synchronized from adjtimex() at start and end
+    "clock": { "realtime_at_origin": "…Z", "boot_id": "…" },   // maps monotonic offsets to wall clock
     "labels": { "phase": "baseline", "ticket": "CASE-0001" },
     "build_info": { "version": "…", "git_sha": "…", "rustc": "1.100.0", "target": "x86_64-unknown-linux-gnu", "glibc": "2.39", "static": false },
     "config": { "samples": 5000, "warmup": 50, "interval_ns": 10000000, "loopback_every": 10,
@@ -70,9 +70,17 @@ formatter. Atomic write: `<path>.tmp-<run_id>` → `fsync` → `rename` → `fsy
 - `config.outlier_threshold_ns` (`--outlier-threshold`, §9.3);
 - `config.path_source` is `declared` with `--path`, otherwise `detected`: `underlay`
   if a physical interface is visible in the network namespace, else `overlay`.
-Fields of later steps (`control`, `load`, `shutdown_deadline_ns`, `no_cgroup_check`,
-`clock.synchronized`, target contexts, `diagnostics`) are added with them (3c2–3e,
-milestone 6).
+- milestone 3c2: `run.cgroup` (own path, quota and floor in millicores, visible
+  ancestors, `ancestor_cpu_throttling` and its note, §3.7), `config.no_cgroup_check`,
+  per cycle `quality.cpu` (`throttled_usec_delta`, `ancestors_throttled_usec_delta`)
+  and `quality.listener_drops` (own loopback listener), and
+  `diagnostics.cycles[].source.netstat` with only the counters that increased.
+- **`clock.synchronized` dropped** (decided in milestone 3c2): it would have needed
+  `adjtimex()`, for which `nix` has no safe wrapper, i.e. a further `unsafe` call,
+  for a diagnostic hint only. Durations never depend on the wall clock (monotonic
+  only); `report` names a possible clock error without knowing the NTP state (§10.6).
+Fields of later steps (`control`, `load`, `shutdown_deadline_ns`, target contexts and
+target diagnostics) are added with them (3d, 3e, milestone 6).
 
 The file has three parts: **measurement** (samples plus the inputs to the validity
 decision), **diagnostics** (context that can explain a change but never decides one),

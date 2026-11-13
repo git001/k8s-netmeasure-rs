@@ -3,9 +3,8 @@
 Reproducible TCP connect-latency measurement in Kubernetes and OpenShift.
 
 **Status: milestone 3 of the [Phase 1 implementation plan](docs/design/2026-11-13_phase1-design/11-implementation-plan.md)
-in progress:** `probe`, `selftest`, `listen` and a first `run` (cycles, loopback
-control, result file; snapshots and the snapshot-based validity rules follow).
-`report` follows. The design is in
+in progress:** `probe`, `selftest`, `listen` and `run` against plain targets (target
+control ports and `--node-context-from` follow). `report` follows. The design is in
 [docs/design/2026-11-13_phase1-design/](docs/design/2026-11-13_phase1-design/README.md).
 
 ## Subcommands so far
@@ -35,6 +34,7 @@ k8s-netmeasure run --target 10.0.0.5:17700 --output result.json \
                    [--samples 5000] [--warmup 50] [--interval 10ms] [--loopback-every 10] \
                    [--cycles 10 | --cycle 20s] [--timeout 5s] [--outlier-threshold 20ms] \
                    [--path overlay|underlay] [--label k=v ...] [--backlog 4096] \
+                   [--no-cgroup-check] \
                    [--node-name N] [--zone Z] [--instance-type T]
 
 # Manual cross-check of one path, same code path as the measurement (not a measurement).
@@ -84,8 +84,15 @@ fields are `unknown`. The NIC family is never derived from the instance type.
 with every `--loopback-every`-th slot on its own loopback listener as a local control.
 The first `--warmup` samples per target are stored but flagged and excluded from
 statistics; `--samples` counts the rest per target. The run is cut into cycles (default
-10, each kept between 2 s and 60 s); each cycle is validated (`sample_count_short`,
-`interrupted`; pacing jitter and overruns are annotations). At the defaults one
+10, each kept between 2 s and 60 s). Around every cycle `run` reads its own cgroup
+throttling (and that of every visible ancestor cgroup with a quota), the SYN drops of
+its loopback listener, the network-namespace TCP counters and the NIC path, and
+marks the cycle invalid for `cpu_throttled`, `listener_drops`,
+`listener_drops_suspected`, `sample_count_short`, `nic_changed` or `interrupted`;
+pacing jitter, overruns, foreign listener drops in the namespace and an unobserved
+NIC path are annotations only. At start it refuses (exit 3) a CPU quota below 500m
+and an unreadable cgroup v2; `--no-cgroup-check` measures anyway and annotates every
+cycle `cpu_throttle_unchecked`. At the defaults one
 target takes about 56 s. The result file is written atomically at the end (a
 temporary `<output>.tmp-<run_id>` is renamed). Exit 0: every cycle valid; 4: at least
 one invalid; 143/130 after SIGTERM/SIGINT, with the file marked `interrupted`; 3 if

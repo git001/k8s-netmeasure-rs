@@ -113,7 +113,8 @@ Last round before implementation. Points taken over after evaluation:
 - §5, §9.1: `config_source` in the example; clap `value_source()` cannot detect CLI
   and env both set, the config layer reads the environment itself;
 - §10.6: `sequential` tolerates ≤ 1 s intersection (clock steps); `clock.synchronized`
-  recorded;
+  recorded (dropped again in milestone 3c2: it needed an extra `unsafe` call for a
+  diagnostic hint only, §5);
 - §11: cost estimate corrected to 1–2.5 CPU-hours; censored-p99 dimension and
   criteria for the censored rule and the intersection-union reading.
 

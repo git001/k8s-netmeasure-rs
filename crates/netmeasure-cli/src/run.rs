@@ -1,4 +1,4 @@
-//! `run` arguments (design §3.4, §3.5, §5, §9). Target control ports,
+//! `run` arguments (design §3.4, §3.5, §3.7, §5, §9). Target control ports,
 //! `--node-context-from` and the shutdown deadline follow in milestones 3d and 3e;
 //! background load in milestone 6.
 
@@ -74,6 +74,12 @@ pub struct RunArgs {
     /// when physical interfaces are visible, else overlay.
     #[arg(long, env = "K8S_NETMEASURE_PATH", value_enum)]
     pub path: Option<PathKind>,
+
+    /// Measure even if the own cgroup v2 is unreadable; throttling is then not
+    /// checked and every cycle is annotated `cpu_throttle_unchecked`.
+    #[arg(long, env = "K8S_NETMEASURE_NO_CGROUP_CHECK", action = clap::ArgAction::SetTrue,
+          value_parser = clap::builder::BoolValueParser::new())]
+    pub no_cgroup_check: bool,
 
     /// Result file (JSON, written atomically at the end).
     #[arg(long, env = "K8S_NETMEASURE_OUTPUT")]

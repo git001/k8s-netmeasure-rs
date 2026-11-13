@@ -30,9 +30,35 @@ pub fn parse(text: &str) -> BTreeMap<String, u64> {
     out
 }
 
+/// Counters that changed between two reads (`after − before`, only increases), for the
+/// per-cycle diagnostics (§5). A counter missing on either side or going backwards is
+/// left out.
+pub fn delta(
+    before: &BTreeMap<String, u64>,
+    after: &BTreeMap<String, u64>,
+) -> BTreeMap<String, u64> {
+    after
+        .iter()
+        .filter_map(|(k, a)| {
+            let d = a.checked_sub(*before.get(k)?)?;
+            (d > 0).then(|| (k.clone(), d))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn delta_keeps_increases_only() {
+        let m = |v: &[(&str, u64)]| v.iter().map(|(k, n)| ((*k).to_owned(), *n)).collect();
+        let d = delta(
+            &m(&[("a", 1), ("b", 5), ("c", 2)]),
+            &m(&[("a", 4), ("b", 5), ("c", 1), ("d", 9)]),
+        );
+        assert_eq!(d, m(&[("a", 3)]));
+    }
 
     #[test]
     fn sections_are_prefixed() {

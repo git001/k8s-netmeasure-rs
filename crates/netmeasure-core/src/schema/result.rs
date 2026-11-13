@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use super::control::{BuildInfo, NodeContext};
+pub use super::cycle::{CpuDelta, Cycle, Quality, Quantiles, Validity};
 
 pub const SCHEMA: &str = "k8s-netmeasure/result";
 pub const SCHEMA_VERSION: u32 = 1;
@@ -19,6 +20,28 @@ pub struct ResultFile {
     pub source: SideContext,
     pub targets: Vec<Target>,
     pub measurement: Measurement,
+    pub diagnostics: Diagnostics,
+}
+
+/// Context that can explain a change but never decides one (§5).
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Diagnostics {
+    pub cycles: Vec<CycleDiagnostics>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CycleDiagnostics {
+    pub cycle_id: String,
+    pub source: SourceDiagnostics,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SourceDiagnostics {
+    /// `/proc/net/netstat` counters that increased during the cycle.
+    pub netstat: BTreeMap<String, u64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -43,6 +66,22 @@ pub struct Run {
     pub config: Config,
     /// Parameter → `cli`, `env` or `default` (§9.1).
     pub config_source: BTreeMap<String, String>,
+    pub cgroup: CgroupCheck,
+}
+
+/// The CPU checks at start (§3.7).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CgroupCheck {
+    /// Own cgroup v2 path; `None` without cgroup v2.
+    pub path: Option<String>,
+    /// Own `cpu.max` in millicores; `None` = unlimited or unreadable.
+    pub quota_millicores: Option<u64>,
+    pub floor_millicores: u64,
+    pub visible_ancestors: Vec<String>,
+    /// `observed`, `inferred_impossible` or `unknown`.
+    pub ancestor_cpu_throttling: String,
+    pub note: Option<String>,
 }
 
 /// Maps the monotonic offsets of this file to wall-clock time.
@@ -52,8 +91,6 @@ pub struct Clock {
     /// Wall-clock time at monotonic offset 0 (the run origin).
     pub realtime_at_origin: String,
     pub boot_id: Option<String>,
-    /// NTP synchronisation at start and end; `None` until it is read (milestone 3c2).
-    pub synchronized: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -75,6 +112,8 @@ pub struct Config {
     pub path_source: String,
     /// `pair` (one target) or `sampled` (several).
     pub topology: String,
+    /// `--no-cgroup-check`: throttling is not checked, every cycle is annotated.
+    pub no_cgroup_check: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -100,47 +139,6 @@ pub struct Target {
 pub struct Measurement {
     pub cycles: Vec<Cycle>,
     pub samples: SampleColumns,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Cycle {
-    pub cycle_id: String,
-    pub index: u64,
-    /// Sample range `[first_sample, end_sample)`.
-    pub first_sample: u64,
-    pub end_sample: u64,
-    /// Monotonic ns from the run origin to this cycle's first scheduled slot; slot `k`
-    /// of the cycle is scheduled at `start_offset_ns + k × interval` unless re-anchored.
-    pub start_offset_ns: u64,
-    pub started_at: String,
-    pub ended_at: String,
-    pub validity: Validity,
-    pub quality: Quality,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Validity {
-    pub valid: bool,
-    pub reasons: Vec<String>,
-    pub annotations: Vec<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Quality {
-    pub wake_lateness_ns: Quantiles,
-    pub overruns: u64,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Quantiles {
-    pub p50: u64,
-    pub p90: u64,
-    pub p99: u64,
-    pub max: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

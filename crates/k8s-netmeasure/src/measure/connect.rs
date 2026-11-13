@@ -14,14 +14,13 @@ use crate::sys::{sockopt, time};
 /// Everything recorded for one attempt.
 ///
 /// The timed section runs from `t0` (right before `connect()`) to `t1` (right after
-/// the wait ends). There is deliberately no end field: `t1 = start_ns + duration_ns`,
-/// and a second field could only disagree. The pacer's own clock reads around
-/// [`attempt`] are different instants on purpose: wake-up before the socket is
-/// created, and slot end after `SO_ERROR`, `TCP_INFO` and `close` (overrun check).
+/// the wait ends); only their difference is kept. Start and end of a slot come from
+/// the pacer's own clock reads around [`attempt`], on purpose different instants:
+/// wake-up before the socket is created, and slot end after `SO_ERROR`, `TCP_INFO`
+/// and `close` (overrun check). An absolute `t0` was dropped in milestone 3c2 because
+/// nothing used it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Attempt {
-    /// `t0` (monotonic ns), taken right before `connect()`.
-    pub start_ns: u64,
     /// `t1 − t0`, with `t1` (monotonic ns) taken right after the wait ends.
     pub duration_ns: u64,
     pub outcome: Outcome,
@@ -79,7 +78,6 @@ pub fn attempt(addr: SocketAddrV4, timeout_ns: u64) -> Attempt {
         tcp_state: tcp_info.state,
     };
     Attempt {
-        start_ns: t0,
         duration_ns: t1 - t0,
         outcome: outcome::classify(&facts),
         errno: outcome::errno(&facts),
@@ -104,7 +102,6 @@ fn prepare() -> std::io::Result<Socket> {
 fn failed_before_start(e: std::io::Error) -> Attempt {
     let errno = e.raw_os_error().unwrap_or(libc::EIO);
     Attempt {
-        start_ns: time::monotonic_ns(),
         duration_ns: 0,
         outcome: Outcome::LocalError,
         errno: Some(errno),

@@ -29,6 +29,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `run`, second part: snapshots before and after every cycle (own and visible
+  ancestor cgroup throttling, loopback listener `SK_MEMINFO_DROPS`, netns
+  `ListenDrops`/`ListenOverflows`, NIC path) with the validity reasons
+  `cpu_throttled`, `listener_drops`, `listener_drops_suspected`, `nic_changed` and the
+  annotations `netns_listen_drops`, `nic_path_unknown`, `cpu_throttle_unchecked`.
+  CPU checks at start: exit 3 for a quota below 500m or an unreadable cgroup v2
+  unless `--no-cgroup-check`; `run.cgroup` records quota, floor, visible ancestors
+  and `ancestor_cpu_throttling` (`observed`, `inferred_impossible`, `unknown`). Per
+  cycle `quality.cpu`, `quality.listener_drops` and `diagnostics` with the netstat
+  counters that increased.
+  The design's `clock.synchronized` field is dropped (it would have needed an extra
+  `unsafe` `adjtimex` call for a diagnostic hint only).
 - `run` subcommand, first part: `--target` (repeatable), `--samples`, `--warmup`,
   `--interval`, `--loopback-every`, `--cycles` / `--cycle` (effective cycle length
   2–60 s), `--timeout`, `--outlier-threshold`, `--path` (else detected), `--label`,

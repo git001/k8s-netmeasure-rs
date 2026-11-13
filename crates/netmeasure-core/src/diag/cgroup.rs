@@ -72,6 +72,30 @@ pub fn parse_cpu_stat(text: &str) -> CpuStat {
     stat
 }
 
+/// CPU quota floor in millicores (§3.7): 500m, plus 500m per load thread.
+pub fn floor_millicores(load_threads: u64) -> u64 {
+    500 + 500 * load_threads
+}
+
+/// How throttling of ancestor cgroups is known (§3.7): `observed` if ancestors are
+/// visible (each with a quota is checked per cycle); without visible ancestors,
+/// `inferred_impossible` if the own cgroup has a limit (the pod quota is then the sum
+/// of all container limits), else `unknown`. The inference ignores pod-level
+/// resources, hence the note.
+pub fn ancestor_throttling(
+    visible_ancestors: usize,
+    own_limit: bool,
+) -> (&'static str, Option<&'static str>) {
+    match (visible_ancestors, own_limit) {
+        (n, _) if n > 0 => ("observed", None),
+        (_, true) => (
+            "inferred_impossible",
+            Some("unverified: pod-level resources not checked"),
+        ),
+        _ => ("unknown", None),
+    }
+}
+
 /// The cgroup v2 path from `/proc/self/cgroup` (`0::<path>`); `None` on cgroup v1.
 pub fn parse_self_cgroup(text: &str) -> Option<String> {
     text.lines()
@@ -91,6 +115,21 @@ pub fn ancestors(path: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn floor_and_ancestor_classification() {
+        assert_eq!(floor_millicores(0), 500);
+        assert_eq!(floor_millicores(2), 1500);
+        assert_eq!(ancestor_throttling(3, false), ("observed", None));
+        assert_eq!(ancestor_throttling(0, true).0, "inferred_impossible");
+        assert!(
+            ancestor_throttling(0, true)
+                .1
+                .unwrap()
+                .contains("unverified")
+        );
+        assert_eq!(ancestor_throttling(0, false), ("unknown", None));
+    }
 
     #[test]
     fn cpu_max() {

@@ -20,8 +20,9 @@ Part of the [Phase 1 design](README.md) · covers §10.6–§10.7 · previous: [
     `concurrent` requires ≥ 0.8 in every period; `sequential` requires an intersection
     of at most **1 s** (review round 3: a clock step after a reboot can shift
     `realtime_at_origin` by milliseconds). Contradiction → exit 5, with the spans and
-    the overlap printed; for `sequential` the message names a clock step as a possible
-    cause and shows `clock.synchronized` of the runs involved (§5).
+    the overlap printed; for `sequential` the message names a clock step or an
+    unsynchronised node clock as a possible cause (the NTP state is not recorded,
+    §5).
   - The output header states the declared design and the validation result.
 - **Crossover is declared explicitly as well.** `report --design concurrent
   --crossover` requires every run to carry the label `period=1` or `period=2`; a

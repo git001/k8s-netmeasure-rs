@@ -18,6 +18,8 @@ Part of the [Phase 1 design](README.md) · covers §3.6–§3.9 · previous: [Me
 | `scheduling_jitter` | p99 of pacing wake-up lateness > **1 ms**, or max > **10 ms** | **annotate only** |
 | `pacing_overrun` | overrun fraction > **5 %** | **annotate only** |
 | `netns_listen_drops` | netns `ListenOverflows/ListenDrops` delta > 0 without own `sk_drops` | annotate only |
+| `nic_path_unknown` | the NIC path before or after the cycle is `unknown` (pod network namespace without a node listener, §5); added in milestone 3c2 so that an unobserved NIC path is never read as unchanged | annotate only |
+| `cpu_throttle_unchecked` | `--no-cgroup-check` was given (§3.7) | annotate only |
 
 **NIC path** (added in milestone 2 planning). The same instance type can run on hosts
 with different NIC hardware, and an accelerated-networking VF can be removed and

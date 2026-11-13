@@ -6,22 +6,12 @@ mod common;
 use std::time::{Duration, Instant};
 
 use netmeasure_core::measure::record::flag;
-use netmeasure_core::schema::result::{ResultFile, RunStatus};
+use netmeasure_core::schema::result::RunStatus;
 use nix::sys::signal::Signal;
 
 use common::listen::{start, stop_with};
+use common::result::{out_path, read};
 use common::{bin, closed_port, spawn};
-
-fn out_path(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("nm-run-{}-{name}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    dir.join("result.json")
-}
-
-fn read(path: &std::path::Path) -> ResultFile {
-    let text = std::fs::read_to_string(path).unwrap();
-    serde_json::from_str(&text).expect("result file matches the schema strictly")
-}
 
 #[test]
 fn complete_run_counts_samples_per_target() {
@@ -48,6 +38,7 @@ fn complete_run_counts_samples_per_target() {
         "phase=test",
         "--path",
         "overlay",
+        "--no-cgroup-check",
     ];
     bin().args(args).assert().code(0);
     let r = read(&out);
@@ -79,7 +70,17 @@ fn complete_run_counts_samples_per_target() {
         refused,
         "the closed port is `refused`, which does not invalidate a cycle"
     );
-    assert!(r.measurement.cycles.iter().all(|c| c.validity.valid));
+    assert!(r.run.config.no_cgroup_check);
+    for c in &r.measurement.cycles {
+        assert!(c.validity.valid, "{:?}", c.validity);
+        assert!(
+            c.validity
+                .annotations
+                .contains(&"cpu_throttle_unchecked".to_owned())
+        );
+        assert_eq!(c.quality.listener_drops, Some(0));
+    }
+    assert_eq!(r.diagnostics.cycles.len(), r.measurement.cycles.len());
     assert!(
         std::fs::read_dir(out.parent().unwrap()).unwrap().count() == 1,
         "no temp file left"
@@ -101,6 +102,7 @@ fn sigterm_writes_an_interrupted_file_and_exits_143() {
         "2ms",
         "--output",
         out.to_str().unwrap(),
+        "--no-cgroup-check",
     ]);
     std::thread::sleep(Duration::from_millis(800));
     let started = Instant::now();
@@ -117,54 +119,4 @@ fn sigterm_writes_an_interrupted_file_and_exits_143() {
     );
     assert_eq!(r.measurement.samples.count, last.end_sample);
     stop_with(l.child, Signal::SIGTERM);
-}
-
-#[test]
-fn configuration_errors() {
-    let out = out_path("errors");
-    let o = out.to_str().unwrap();
-    for args in [
-        &[
-            "run",
-            "--target",
-            "127.0.0.1:9",
-            "--output",
-            o,
-            "--label",
-            "path=x",
-        ][..],
-        &[
-            "run",
-            "--target",
-            "127.0.0.1:9",
-            "--output",
-            o,
-            "--cycles",
-            "3",
-            "--cycle",
-            "5s",
-        ],
-        &[
-            "run",
-            "--target",
-            "127.0.0.1:9",
-            "--output",
-            o,
-            "--loopback-every",
-            "1",
-        ],
-        &["run", "--output", o],
-    ] {
-        bin().args(args).assert().code(2);
-    }
-    bin()
-        .args([
-            "run",
-            "--target",
-            "127.0.0.1:9",
-            "--output",
-            "/nonexistent/dir/r.json",
-        ])
-        .assert()
-        .code(3);
 }

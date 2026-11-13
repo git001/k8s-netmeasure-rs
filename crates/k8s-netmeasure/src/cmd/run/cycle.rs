@@ -1,12 +1,17 @@
 //! After a cycle (design §3.5, §3.6, §9.3): validity, quality figures, the cycle record
 //! and its log lines. Runs on the main thread, never inside the timed section.
 
+use netmeasure_core::diag::netstat;
 use netmeasure_core::measure::outcome::Outcome;
 use netmeasure_core::measure::record::flag;
-use netmeasure_core::measure::validity::{self, CycleFacts};
-use netmeasure_core::schema::result::{Cycle, Quality, Quantiles, Target};
+use netmeasure_core::measure::validity::{self, CycleFacts, delta};
+use netmeasure_core::schema::nic::NicPath;
+use netmeasure_core::schema::result::{
+    CpuDelta, Cycle, CycleDiagnostics, Quality, Quantiles, SourceDiagnostics, Target,
+};
 use netmeasure_core::stats::quantile::type1;
 
+use super::snapshot::Snap;
 use super::worker::CycleRun;
 
 pub struct Done<'a> {
@@ -17,9 +22,14 @@ pub struct Done<'a> {
     pub started_at: String,
     pub ended_at: String,
     pub run: &'a CycleRun,
+    pub before: &'a Snap,
+    pub after: &'a Snap,
+    pub nic_first: Option<&'a NicPath>,
+    pub cgroup_unchecked: bool,
 }
 
-pub fn record(d: Done<'_>) -> Cycle {
+/// The cycle record and its diagnostics entry.
+pub fn record(d: Done<'_>) -> (Cycle, CycleDiagnostics) {
     let mut late: Vec<u64> = d.run.samples.iter().map(|s| s.late_ns).collect();
     late.sort_unstable();
     let invalid = d
@@ -35,9 +45,23 @@ pub fn record(d: Done<'_>) -> Cycle {
         overruns: d.run.overruns,
         lateness_sorted: late.clone(),
         interrupted: d.run.interrupted,
+        before: d.before.counters,
+        after: d.after.counters,
+        cgroup_unchecked: d.cgroup_unchecked,
+        nic_before: d.before.nic.clone(),
+        nic_after: d.after.nic.clone(),
+        nic_first: d.nic_first.cloned(),
     });
-    Cycle {
-        cycle_id: ulid::Ulid::generate().to_string(),
+    let (b, a) = (&d.before.counters, &d.after.counters);
+    let cycle_id = ulid::Ulid::generate().to_string();
+    let diagnostics = CycleDiagnostics {
+        cycle_id: cycle_id.clone(),
+        source: SourceDiagnostics {
+            netstat: netstat::delta(&d.before.netstat, &d.after.netstat),
+        },
+    };
+    let cycle = Cycle {
+        cycle_id,
         index: d.index,
         first_sample: d.first_sample,
         end_sample: d.first_sample + d.run.samples.len() as u64,
@@ -48,8 +72,17 @@ pub fn record(d: Done<'_>) -> Cycle {
         quality: Quality {
             wake_lateness_ns: quantiles(&late),
             overruns: d.run.overruns,
+            cpu: CpuDelta {
+                throttled_usec_delta: delta(b.throttled_usec, a.throttled_usec),
+                ancestors_throttled_usec_delta: delta(
+                    b.ancestors_throttled_usec,
+                    a.ancestors_throttled_usec,
+                ),
+            },
+            listener_drops: delta(b.sk_drops, a.sk_drops),
         },
-    }
+    };
+    (cycle, diagnostics)
 }
 
 /// One INFO line per target (§9.3), WARN per outlier and for an invalid cycle.
