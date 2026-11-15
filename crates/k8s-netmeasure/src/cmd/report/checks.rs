@@ -1,6 +1,6 @@
-//! Checks before anything is compared (design §10.5, §10.6): the declared design
-//! against the wall-clock spans, the context of both sides per node, and the evidence
-//! label of the sequential design.
+//! Checks before anything is compared (design §10.6): the declared design against
+//! the wall-clock spans and the context of both sides per node (evidence label:
+//! `evidence.rs`).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -161,29 +161,6 @@ fn rings(c: &NodeContext) -> String {
             v.sort();
             v.join(" ")
         }
-    }
-}
-
-/// Evidence label of the sequential design (§10.5) and the reason.
-pub fn evidence(before: &[&RunData], after: &[&RunData]) -> (&'static str, String) {
-    let runs = |rs: &[&RunData]| {
-        let mut per: BTreeMap<&str, usize> = BTreeMap::new();
-        rs.iter()
-            .for_each(|r| *per.entry(r.node.as_str()).or_default() += 1);
-        per.values().copied().min().unwrap_or(0)
-    };
-    let (rb, ra) = (runs(before), runs(after));
-    let mut order: Vec<(i128, bool)> = before.iter().map(|r| (r.start_ns, false)).collect();
-    order.extend(after.iter().map(|r| (r.start_ns, true)));
-    order.sort();
-    let switches = order.windows(2).filter(|w| w[0].1 != w[1].1).count();
-    let detail = format!("{rb} vs {ra} runs per node, {switches} side switch(es) in time");
-    if rb.min(ra) <= 1 {
-        ("exploratory", detail)
-    } else if rb.min(ra) >= 5 && switches >= 3 {
-        ("strong", detail)
-    } else {
-        ("preliminary", detail)
     }
 }
 

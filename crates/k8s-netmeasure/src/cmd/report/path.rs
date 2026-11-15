@@ -8,7 +8,7 @@ use netmeasure_core::stats::compare::{Comparison, Plan, compare};
 use netmeasure_core::stats::side::{RunInput, Side};
 
 use super::load::RunData;
-use super::{block, checks, text};
+use super::{block, evidence, text};
 
 /// The runs of one side of one path (their targets already split per stratum).
 pub struct Prepared<'a> {
@@ -117,6 +117,13 @@ pub fn report(path: &str, b: &Prepared, a: &Prepared, plan: &Plan) {
     let loopback = compare(&lb, &la, &within_budget(&loop_plan, &lb, &la));
     let (both, one) = strata(b, a);
     text::path(path, &loopback, both.len());
+    let (common, only_b, only_a) = evidence::node_sets(&b.runs, &a.runs);
+    if only_b + only_a > 0 {
+        println!(
+            "! source nodes: {common} on both sides, {only_b} only before, {only_a} only after \
+             (the sequential design compares the same nodes)"
+        );
+    }
     for s in &both {
         let result = StratumResult {
             stratum: s,
@@ -124,7 +131,7 @@ pub fn report(path: &str, b: &Prepared, a: &Prepared, plan: &Plan) {
                 let (sb, sa) = (b.side(s), a.side(s));
                 compare(&sb, &sa, &within_budget(plan, &sb, &sa))
             },
-            evidence: checks::evidence(&b.runs_with(s), &a.runs_with(s)),
+            evidence: evidence::evidence(&b.runs_with(s), &a.runs_with(s)),
         };
         block::stratum(&result, plan);
     }

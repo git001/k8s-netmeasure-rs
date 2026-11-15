@@ -7,6 +7,7 @@
 
 mod block;
 mod checks;
+mod evidence;
 mod fmt;
 mod load;
 mod params;

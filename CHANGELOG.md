@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after `PENDING_S` is given up with the scheduler's reason; run pods request
   `RUN_CPU_REQUEST` (250m) with a limit of 1 CPU.
 - README: acknowledgement line.
+- `report` counts the source nodes on both sides and on one side only per path (`!`
+  line); without a common node the evidence is `exploratory`, because the sequential
+  design compares the same nodes and two different node groups differ in more than
+  the declared factor.
 - `report` is faster and needs less memory: the bootstrap replicates run on all CPU
   cores (replicate `i` uses its own streams of the seed, so the result does not
   depend on the thread count; the threads are limited to 1 GiB of resampling

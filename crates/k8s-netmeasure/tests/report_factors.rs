@@ -61,3 +61,23 @@ fn ring_sizes_are_the_treatment_and_the_kernel_must_not_change() {
         String::from_utf8_lossy(&report(&before, &after).code(5).get_output().stderr).into_owned();
     assert!(err.contains("kernel_release k1 → k2"), "{err}");
 }
+
+#[test]
+fn different_source_nodes_are_observational() {
+    let l = start();
+    let (before, after) = dirs("other-nodes");
+    run(&l, &before, "200");
+    run(&l, &after, "200");
+    context(&before, 256, "k1");
+    context(&after, 1024, "k1");
+    edit(&after, |v| {
+        v["source"]["context_before"]["node_name"]["value"] = "node-b".into();
+    });
+    let out = stdout(&report(&before, &after).code(0));
+    for want in [
+        "! source nodes: 0 on both sides, 1 only before, 1 only after",
+        "evidence: exploratory (no source node on both sides",
+    ] {
+        assert!(out.contains(want), "missing `{want}` in:\n{out}");
+    }
+}

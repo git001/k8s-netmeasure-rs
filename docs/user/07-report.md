@@ -68,7 +68,10 @@ rationale down: chosen afterwards, they can be fitted to the result.
   follow the observed family, never the instance type.
 - `evidence`: `exploratory` with one run per node and side, `preliminary` with more,
   `strong` only with ≥ 5 runs per side **interleaved** in time (≥ 3 side switches),
-  which a before/after kernel change cannot have.
+  which a before/after kernel change cannot have. The sequential design compares the
+  **same source nodes**: a `!` line per path counts the nodes on both sides and on one
+  side only, and without a common node the label is `exploratory` (an observational
+  comparison of two node groups, which differ in more than the declared factor).
 - `failures` gets its own verdict only from 10 failures on both sides together; SYN
   retransmissions are diagnostics only.
 - `local control`: the median of the loopback control. A significant shift means
