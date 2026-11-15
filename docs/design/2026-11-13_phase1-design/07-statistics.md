@@ -33,7 +33,9 @@ Part of the [Phase 1 design](README.md) · covers §10.1–§10.5 · previous: [
   - Below m, the output is a warning and the required sample count, `n = m / (1 − p)`,
     instead of an interval.
 - **Series** (milestone 4a): per target of a run, the samples of every valid cycle
-  without warm-up, in measurement order, one segment per cycle. `ok` enters as its
+  without warm-up, in measurement order. Consecutive valid cycles form one segment
+  (they are contiguous in time); an invalid cycle ends it (corrected in 4b, see
+  §10.2). `ok` enters as its
   duration, `timeout` as censored; `refused`/`net_error` count only as failures;
   `local_error`/`anomaly` (only in invalid cycles) count nowhere.
 
@@ -82,7 +84,20 @@ Wall time below: `pair` mode, 10 ms interval, warm-up 50, loopback every 10th sl
   the floor does not cause under-coverage when the true dependence is shorter or
   longer.
 - Blocks never cross an excluded cycle or a run boundary; each valid segment is
-  resampled circularly within itself.
+  resampled circularly within itself. **A segment is a stretch of consecutive valid
+  cycles, not a single cycle** (decided in milestone 4b): with one segment per cycle
+  (about 500 samples per target) and the 5-s floor (225 samples at two targets), a
+  segment held only about two blocks, a replicate was nearly a rotation of the
+  original, and the bootstrap interval came out *narrower* than the naive one on the
+  first cluster baselines. With merged segments the two agree, as they should where
+  the exceedance indicator shows no autocorrelation (lag-1 ≈ ±0.01 on those runs;
+  Politis–White 1–9 samples, so the floor decided). A segment shorter than about
+  two mean block lengths still contributes too little variance; the simulation
+  suite (§11) checks the effect with excluded cycles.
+- **First cluster baselines** (2026-11-15, same pair, nothing changed between runs):
+  the within-run p99 interval is about 1 ms wide, while p99 moved by up to 1.3 ms
+  between runs. Between-run variance dominates; this is why the first resampling
+  level draws runs (§10.3) and why one run per side is only `exploratory` (§10.5).
 - B = 10,000 replicates, percentile intervals, RNG seed in the report JSON.
 
 ### 10.3 Replication levels

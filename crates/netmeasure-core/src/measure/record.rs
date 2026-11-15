@@ -14,6 +14,20 @@ pub const RESULT_CODES: [&str; 6] = [
     "anomaly",
 ];
 
+/// The outcome behind a `result` code; `None` for an unknown code.
+pub fn outcome_of(code: u8) -> Option<Outcome> {
+    [
+        Outcome::Ok,
+        Outcome::Timeout,
+        Outcome::Refused,
+        Outcome::NetError,
+        Outcome::LocalError,
+        Outcome::Anomaly,
+    ]
+    .into_iter()
+    .find(|o| result_code(*o) == code)
+}
+
 pub fn result_code(o: Outcome) -> u8 {
     match o {
         Outcome::Ok => 0,
@@ -112,6 +126,7 @@ mod tests {
         {
             assert_eq!(usize::from(result_code(o)), i);
             assert_eq!(serde_json::to_value(o).unwrap(), RESULT_CODES[i]);
+            assert_eq!(outcome_of(result_code(o)), Some(o));
         }
     }
 

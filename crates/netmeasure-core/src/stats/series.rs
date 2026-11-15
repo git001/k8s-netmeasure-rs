@@ -1,31 +1,13 @@
 //! Sample series for the statistics (design §10.1, §10.2): per target of one run, the
-//! counted samples of every **valid** cycle, in measurement order, one segment per
-//! cycle. Warm-up samples and invalid cycles are left out; a block never crosses a
+//! counted samples of every **valid** cycle, in measurement order. Consecutive valid
+//! cycles form one segment (they are contiguous in time); an invalid cycle ends it.
+//! Warm-up samples and invalid cycles are left out; a block never crosses a
 //! segment boundary (§10.2).
 
-use crate::measure::outcome::Outcome;
-use crate::measure::record::{RESULT_CODES, flag};
+use crate::measure::record::{RESULT_CODES, flag, outcome_of};
+
+pub use super::segment::{CENSORED, Segment};
 use crate::schema::result::{ResultFile, SampleColumns};
-
-/// A timeout in the latency distribution: larger than every measured value, meaning
-/// "at least the timeout" (§10.1).
-pub const CENSORED: u64 = u64::MAX;
-
-/// The counted samples of one target in one valid cycle.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct Segment {
-    pub cycle: u64,
-    /// Latencies in measurement order: `ok` as ns, `timeout` as [`CENSORED`].
-    pub values: Vec<u64>,
-    /// Connects counted for the failure rate (every outcome except local errors).
-    pub attempts: u64,
-    /// `timeout` + `refused` + `net_error` (§10.4).
-    pub failures: u64,
-    /// Connects with at least one SYN retransmission, and connects where the kernel
-    /// did not report it.
-    pub syn_retransmitted: u64,
-    pub syn_unknown: u64,
-}
 
 /// One target of one run.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -51,7 +33,8 @@ impl Series {
     }
 
     pub fn excluded_cycles(&self, cycles: u64) -> u64 {
-        cycles.saturating_sub(self.segments.len() as u64)
+        let used: usize = self.segments.iter().map(|s| s.cycles.len()).sum();
+        cycles.saturating_sub(used as u64)
     }
 }
 
@@ -127,7 +110,12 @@ pub fn from_parts(p: &Parts) -> Result<Vec<Series>, String> {
             segments: Vec::new(),
         })
         .collect();
-    for cycle in p.cycles.iter().filter(|c| c.valid) {
+    let mut open = false; // the previous cycle was valid: extend the last segment
+    for cycle in p.cycles {
+        if !cycle.valid {
+            open = false;
+            continue;
+        }
         let (first, end) = (cycle.first as usize, cycle.end as usize);
         if first > end || end > n {
             return Err(format!("cycle {} has an invalid sample range", cycle.index));
@@ -135,7 +123,7 @@ pub fn from_parts(p: &Parts) -> Result<Vec<Series>, String> {
         let mut segs: Vec<Segment> = out
             .iter()
             .map(|_| Segment {
-                cycle: cycle.index,
+                cycles: vec![cycle.index],
                 ..Segment::default()
             })
             .collect();
@@ -146,55 +134,29 @@ pub fn from_parts(p: &Parts) -> Result<Vec<Series>, String> {
             let seg = segs
                 .get_mut(usize::from(s.target[i]))
                 .ok_or_else(|| format!("sample {i} names an unknown target"))?;
-            add(
-                seg,
-                outcome(s.result[i])?,
+            seg.add(
+                outcome_of(s.result[i])
+                    .ok_or_else(|| format!("unknown result code {}", s.result[i]))?,
                 s.duration_ns[i],
                 s.syn_retrans[i],
             );
         }
         for (series, seg) in out.iter_mut().zip(segs) {
-            if seg.attempts > 0 {
-                series.segments.push(seg);
+            match series.segments.last_mut() {
+                _ if seg.attempts == 0 => {}
+                Some(last) if open => last.merge(seg),
+                _ => series.segments.push(seg),
             }
         }
+        open = true;
     }
     Ok(out)
-}
-
-fn outcome(code: u8) -> Result<Outcome, String> {
-    Ok(match code {
-        0 => Outcome::Ok,
-        1 => Outcome::Timeout,
-        2 => Outcome::Refused,
-        3 => Outcome::NetError,
-        4 => Outcome::LocalError,
-        5 => Outcome::Anomaly,
-        other => return Err(format!("unknown result code {other}")),
-    })
-}
-
-fn add(seg: &mut Segment, o: Outcome, duration_ns: u64, syn_retrans: i64) {
-    if o.invalidates_cycle() {
-        return; // never in a valid cycle; kept out of every family regardless
-    }
-    seg.attempts += 1;
-    seg.failures += u64::from(o.is_failure());
-    match o {
-        Outcome::Ok => seg.values.push(duration_ns),
-        Outcome::Timeout => seg.values.push(CENSORED),
-        _ => {}
-    }
-    match syn_retrans {
-        r if r < 0 => seg.syn_unknown += 1,
-        r if r > 0 => seg.syn_retransmitted += 1,
-        _ => {}
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::measure::outcome::Outcome;
     use crate::measure::record::{Sample, columns};
 
     fn sample(target: u16, ns: u64, outcome: Outcome, flags: u8, retrans: Option<u32>) -> Sample {
@@ -257,12 +219,51 @@ mod tests {
         assert_eq!((b.name.as_str(), b.segments.len()), ("node-b", 2));
         assert_eq!(b.segments[0].values, vec![1000, CENSORED]);
         assert_eq!((b.segments[0].attempts, b.segments[0].failures), (2, 1));
-        assert_eq!(b.segments[1].cycle, 2);
+        assert_eq!(b.segments[1].cycles, vec![2]);
         assert_eq!(b.segments[1].values, vec![3000]);
         assert_eq!((b.segments[1].failures, b.segments[1].syn_unknown), (1, 1));
         assert_eq!(b.segments[1].syn_retransmitted, 1);
         assert_eq!(b.sorted_values(), vec![1000, 3000, CENSORED]);
         assert_eq!(b.excluded_cycles(3), 1);
+    }
+
+    #[test]
+    fn consecutive_valid_cycles_form_one_segment() {
+        let s = columns(&[
+            sample(1, 10, Outcome::Ok, 0, Some(0)),
+            sample(1, 20, Outcome::Ok, 0, Some(0)),
+            sample(1, 30, Outcome::Ok, 0, Some(0)),
+            sample(1, 40, Outcome::Ok, 0, Some(0)),
+        ]);
+        let range = |index, valid| CycleRange {
+            index,
+            first: index,
+            end: index + 1,
+            valid,
+        };
+        let cycles = [
+            range(0, true),
+            range(1, true),
+            range(2, false),
+            range(3, true),
+        ];
+        let targets = [(0, "lo".to_owned()), (1, "b".to_owned())];
+        let out = from_parts(&Parts {
+            run_id: "R",
+            timeout_ns: 1,
+            targets: &targets,
+            cycles: &cycles,
+            samples: &s,
+        })
+        .unwrap();
+        let b = &out[1];
+        assert_eq!(b.segments.len(), 2);
+        assert_eq!(
+            (b.segments[0].cycles.clone(), b.segments[0].values.clone()),
+            (vec![0, 1], vec![10, 20])
+        );
+        assert_eq!(b.segments[1].cycles, vec![3]);
+        assert_eq!(b.excluded_cycles(4), 1);
     }
 
     #[test]

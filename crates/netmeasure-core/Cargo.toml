@@ -12,6 +12,9 @@ publish.workspace = true
 libc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# Seeded, platform-independent bootstrap RNG; the seed is part of the report.
+rand.workspace = true
+rand_chacha.workspace = true
 
 [lints]
 workspace = true

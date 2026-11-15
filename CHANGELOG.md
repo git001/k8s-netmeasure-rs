@@ -10,11 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Statistics, milestone 4a (`netmeasure-core::stats`): per-target sample series from
-  result files (valid cycles only, without warm-up, one segment per cycle; timeouts
+  result files (valid cycles only, without warm-up, consecutive valid cycles as one
+  segment; timeouts
   censored, failures and SYN retransmissions counted), the type-1 quantile with
   censoring (`≥ timeout`), the distribution-free order-statistic interval with its
   exact binomial coverage, and the tail minimum of 40 expected exceedances with the
   required sample count below it.
+- Statistics, milestone 4b: the stationary block bootstrap within a run's segments
+  (seeded `ChaCha8`, blocks never cross an excluded cycle), the Politis–White block
+  length with the Patton–Politis–White correction on the exceedance indicator, the
+  5-s floor and the `n/10` cap with their conflict flag, and the autocorrelation for
+  transparency. New dependencies: `rand` 0.10.3 (already in the graph), `rand_chacha`
+  0.10.0.
 
 ### Changed
 

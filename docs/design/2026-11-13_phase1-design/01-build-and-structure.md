@@ -81,7 +81,7 @@ project containing every crate below. Results:
 | `tracing` | 0.1.44 | `default-features = false`, `std` | logging facade | without defaults: no `tracing-attributes`, which would pull in a second `syn` major version |
 | `tracing-subscriber` | 0.3.23 | `json` | JSON lines, `flatten_event(true)`, `with_span_list(false)` | |
 | `ulid` | 3.0.0 | — | `run_id`, `cycle_id`, `listener_instance` | |
-| `rand` / `rand_chacha` | 0.10.3 / 0.10.0 | — | seeded bootstrap RNG (seed in report) | core only |
+| `rand` / `rand_chacha` | 0.10.3 / 0.10.0 | `rand`: `default-features = false` | seeded bootstrap RNG (`ChaCha8`, seed in report) | core only; added in milestone 4b. `rand` was already in the graph through `ulid`; `rand_chacha` brings `ppv-lite86` and `zerocopy` (without its derive) |
 | `statrs` | 0.19.1 | `default-features = false` | binomial, beta, normal quantiles | without defaults: no `nalgebra` (about 30 crates fewer). Milestone 4a computes the binomial CDF itself (exact, log space); whether `statrs` is still needed is decided in 4b/4c |
 | `glob` | 0.3.4 | — | `report --before 'results/x/*.json'` | |
 | `jiff` | 0.2.43 | `default-features = false`, `std`, `serde` | UTC `Timestamp` (ns, RFC 3339), `SignedDuration`, CLI durations | only via `netmeasure-util::time`; no tz database; never in the timed section |
