@@ -18,6 +18,7 @@ by step: [user guide, Running in Kubernetes and OpenShift](../../docs/user/05-ku
 | | `run-overlay.yaml` | Job: overlay measurement from one source node |
 | | `run-underlay.yaml` | Job: underlay measurement from one source node |
 | | `results-reader.yaml` | pod to fetch the result files from the volume |
+| `mesh/` | `mesh.sh` | every node measures every other node, no hand-edited manifests ([README](mesh/README.md)) |
 
 Placeholders to set: the image tag in both `kustomization.yaml` (`SET-ME`), and in
 the Jobs `SOURCE-NODE`, the `--target` addresses and `PHASE`.

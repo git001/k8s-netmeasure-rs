@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `deploy/examples/mesh/mesh.sh`: every node measures every other node without
+  hand-edited manifests. It deploys the listeners (with optional node labels and
+  tolerations from the environment), finds the listener addresses, runs one Job per
+  source node in parallel, overlay and underlay alternating in rounds, copies the
+  result files out of an `emptyDir` and deletes the Jobs.
+- README: acknowledgement line.
+
 - Statistics, milestone 4a (`netmeasure-core::stats`): per-target sample series from
   result files (valid cycles only, without warm-up, consecutive valid cycles as one
   segment; timeouts

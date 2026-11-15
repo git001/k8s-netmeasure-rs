@@ -153,6 +153,22 @@ first Job pod; it stays there, so Jobs in other zones need their own claim. A
 ReadWriteOnce volume serialises Jobs on different source nodes; use ReadWriteMany
 or one claim per Job for concurrent runs.
 
+## Many nodes: the mesh script
+
+For a before/after comparison across many nodes, hand-edited Jobs are error-prone.
+[`deploy/examples/mesh/mesh.sh`](../../deploy/examples/mesh/README.md) deploys the
+listeners, finds their addresses itself, runs one Job per source node against every
+other node (overlay and underlay alternating), copies the result files out and
+cleans up. Node labels and tolerations for tainted nodes are passed as environment
+variables (`NODE_SELECTOR`, `TOLERATIONS`). Each node opens about 100 connections per
+second during a round (about 30 KB/s); a round takes about 2 min at 12 nodes.
+
+```sh
+export IMAGE=ghcr.io/git001/k8s-netmeasure-rs@sha256:<digest>
+deploy/examples/mesh/mesh.sh deploy
+deploy/examples/mesh/mesh.sh series before 5
+```
+
 ## Overlay with a node listener
 
 For overlay measurements run two `listen` on every node involved: one with
