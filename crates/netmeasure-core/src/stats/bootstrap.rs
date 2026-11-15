@@ -7,8 +7,18 @@ use rand::RngExt;
 use rand_chacha::ChaCha8Rng;
 
 /// Fills `out` with one replicate of `segments` (concatenated).
-pub fn resample(segments: &[&[u64]], mean_block: f64, rng: &mut ChaCha8Rng, out: &mut Vec<u64>) {
+pub fn resample<T: Copy>(
+    segments: &[&[T]],
+    mean_block: f64,
+    rng: &mut ChaCha8Rng,
+    out: &mut Vec<T>,
+) {
     out.clear();
+    append(segments, mean_block, rng, out);
+}
+
+/// Appends one replicate of `segments` to `out` (several runs into one pool).
+pub fn append<T: Copy>(segments: &[&[T]], mean_block: f64, rng: &mut ChaCha8Rng, out: &mut Vec<T>) {
     let restart = 1.0 / mean_block.max(1.0);
     for seg in segments.iter().filter(|s| !s.is_empty()) {
         let len = seg.len();

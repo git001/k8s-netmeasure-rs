@@ -120,7 +120,17 @@ Wall time below: `pair` mode, 10 ms interval, warm-up 50, loopback every 10th sl
   - Joint resampling of synchronised wall-clock blocks would include the covariance
     and be tighter; it is a candidate for later, not Phase 1.
 - Between-run spread is always shown: per-run quantile estimates and their range per
-  side. With k runs, two-stage resampling underestimates between-run variance by
+  side.
+- **Implemented in milestone 4c:** the side's block length is the largest applied
+  per-run value for the primary quantile, used for all quantiles and the rates;
+  latencies and per-attempt marks (failure, SYN retransmission, unknown) are
+  resampled with the same block length; the two sides use independent `ChaCha8`
+  streams derived from the one recorded seed. The cross-group correlation check is
+  implemented as a pure computation; aligning the runs in wall-clock time is part of
+  `report` (milestone 5). First real check (2026-11-15, unchanged runs, relative
+  margin 10 %, k = 2): p99 `equivalent` or `inconclusive` on every pair, never
+  `better`/`worse`; with 1–2 runs per side the TOST interval (≈ ±7–12 %) is wider
+  than the margin, so a 10 % margin needs more runs per side. With k runs, two-stage resampling underestimates between-run variance by
   about (k−1)/k; the evidence label reflects that.
 
 ### 10.4 Compared quantity, verdicts, margins
@@ -138,6 +148,11 @@ Wall time below: `pair` mode, 10 ms interval, warm-up 50, loopback every 10th sl
     95 % interval also excludes 0.
   - `inconclusive`: otherwise.
   - Without a margin, `equivalent` is never reported.
+- **Effects under censoring** (milestone 4c): a censored quantile enters a difference
+  as +∞; with a censored reference and a measured after-side the ratio is taken as 0
+  (the true ratio is below `after / timeout` < 1, so only `better` can follow, and
+  that direction is correct); both censored is undefined and makes the interval, and
+  the verdict, `inconclusive` ("censored").
 - **Verdicts under censoring** (added in review round 3). Timeouts enter the bootstrap
   as +∞ (§10.1); ordering, and therefore percentile intervals, stay well defined.
   - An interval bound is **infinite** when enough replicates are censored; a finite

@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   5-s floor and the `n/10` cap with their conflict flag, and the autocorrelation for
   transparency. New dependencies: `rand` 0.10.3 (already in the graph), `rand_chacha`
   0.10.0.
+- Statistics, milestone 4c: sides with hierarchical replication (nodes → runs →
+  blocks; one node in the sequential design), between-run spread, the comparison of
+  two sides (difference or ratio), verdicts `better` / `worse` / `equivalent` (TOST)
+  / `inconclusive` with the censoring rules, one primary quantile with a verdict and
+  the others descriptive, Bonferroni levels over `k`, failure rates with their own
+  verdict family and SYN retransmissions as diagnostics (both bootstrapped, verdict
+  or interval only from 10 events, Clopper–Pearson descriptive below), and the
+  cross-group correlation of the concurrent design as a pure computation.
 
 ### Changed
 

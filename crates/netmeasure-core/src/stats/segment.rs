@@ -7,6 +7,16 @@ use crate::measure::outcome::Outcome;
 /// "at least the timeout" (§10.1).
 pub const CENSORED: u64 = u64::MAX;
 
+/// Per-attempt marks, in measurement order, for the rate families (§10.4).
+pub mod mark {
+    /// `timeout`, `refused` or `net_error`.
+    pub const FAILED: u8 = 1;
+    /// At least one SYN retransmission.
+    pub const SYN_RETRANSMITTED: u8 = 1 << 1;
+    /// The kernel did not report SYN retransmissions.
+    pub const SYN_UNKNOWN: u8 = 1 << 2;
+}
+
 /// The counted samples of one target in a stretch of consecutive valid cycles.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Segment {
@@ -22,6 +32,8 @@ pub struct Segment {
     /// did not report it.
     pub syn_retransmitted: u64,
     pub syn_unknown: u64,
+    /// One [`mark`] byte per attempt, in measurement order (block bootstrap of rates).
+    pub marks: Vec<u8>,
 }
 
 impl Segment {
@@ -33,16 +45,24 @@ impl Segment {
         }
         self.attempts += 1;
         self.failures += u64::from(o.is_failure());
+        let mut m = if o.is_failure() { mark::FAILED } else { 0 };
         match o {
             Outcome::Ok => self.values.push(duration_ns),
             Outcome::Timeout => self.values.push(CENSORED),
             _ => {}
         }
         match syn_retrans {
-            r if r < 0 => self.syn_unknown += 1,
-            r if r > 0 => self.syn_retransmitted += 1,
+            r if r < 0 => {
+                self.syn_unknown += 1;
+                m |= mark::SYN_UNKNOWN;
+            }
+            r if r > 0 => {
+                self.syn_retransmitted += 1;
+                m |= mark::SYN_RETRANSMITTED;
+            }
             _ => {}
         }
+        self.marks.push(m);
     }
 
     /// Appends the next consecutive cycle.
@@ -53,5 +73,6 @@ impl Segment {
         self.failures += next.failures;
         self.syn_retransmitted += next.syn_retransmitted;
         self.syn_unknown += next.syn_unknown;
+        self.marks.extend(next.marks);
     }
 }
