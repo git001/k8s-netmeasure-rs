@@ -10,6 +10,10 @@ use common::{bin, stdout};
 
 /// A short real run against the listener, written into `dir`.
 fn run(l: &Running, dir: &Path, samples: &str) {
+    run_at(l, dir, samples, "1ms");
+}
+
+fn run_at(l: &Running, dir: &Path, samples: &str, interval: &str) {
     std::fs::create_dir_all(dir).unwrap();
     let control_port = l.control.rsplit(':').next().unwrap();
     bin()
@@ -23,7 +27,7 @@ fn run(l: &Running, dir: &Path, samples: &str) {
         .args(["--samples", samples, "--warmup", "0"])
         .args([
             "--interval",
-            "1ms",
+            interval,
             "--path",
             "underlay",
             "--node-name",
@@ -132,4 +136,28 @@ fn overlapping_sides_and_usage_errors_are_refused() {
         .code(2);
     let err = String::from_utf8_lossy(&assert.get_output().stderr).into_owned();
     assert!(err.contains("given twice"), "{err}");
+}
+
+#[test]
+fn different_load_parameters_are_never_pooled() {
+    let l = start();
+    let (before, after) = dirs("params");
+    run_at(&l, &before, "200", "1ms");
+    run_at(&l, &after, "200", "2ms");
+    let assert = bin()
+        .args(["report", "--design", "sequential", "--factor", "kernel"])
+        .args([
+            "--before",
+            before.to_str().unwrap(),
+            "--after",
+            after.to_str().unwrap(),
+        ])
+        .args(["--replicates", "1000"])
+        .assert()
+        .code(5);
+    let err = String::from_utf8_lossy(&assert.get_output().stderr).into_owned();
+    assert!(
+        err.contains("never pooled") && err.contains("interval 2 ms"),
+        "{err}"
+    );
 }

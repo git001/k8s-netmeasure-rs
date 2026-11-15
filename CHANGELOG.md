@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after `PENDING_S` is given up with the scheduler's reason; run pods request
   `RUN_CPU_REQUEST` (250m) with a limit of 1 CPU.
 - README: acknowledgement line.
+- `report` refuses (exit 5) to pool runs of a path whose load parameters differ
+  (interval, loopback share, connect timeout, topology) and names each parameter
+  set with an example run (design §10.6).
 - Mesh script: `NODES` restricts listeners and runs to named nodes (node affinity on
   `metadata.name`, still DaemonSets), with a warning for a name that gets no
   listener; `nodes` lists the candidates with zone and instance type; `inventory`

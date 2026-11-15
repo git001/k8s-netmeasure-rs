@@ -33,6 +33,11 @@ The report header names what has validated the method.
 | `--equivalence-margin` | `10%` (on the ratio after/before) or `50us` (on the difference); needs `--equivalence-rationale`. Without a margin the verdict is never `equivalent` |
 | `--before`, `--after` | files or directories (searched recursively; other JSON files are skipped) |
 
+**Measure both sides alike.** Within a path, every run of both sides must have the
+same `--interval`, loopback share, `--timeout` and topology; otherwise `report`
+refuses (exit 5) and names each parameter set with an example run. The sample count
+may differ, it changes only the precision.
+
 Choose the primary quantile and the margin **before** the measurement and write the
 rationale down: chosen afterwards, they can be fitted to the result.
 
@@ -71,4 +76,4 @@ rationale down: chosen afterwards, they can be fitted to the result.
 | 0 | report produced (whatever the verdict) |
 | 1 | internal error |
 | 2 | usage error: missing `--design`/`--factor`, a margin without rationale, unreadable or invalid files, the same run given twice on one side (e.g. one file in two archives) |
-| 5 | comparison refused: the sides overlap in time, or a node's NIC family or CPU model changed |
+| 5 | comparison refused: the sides overlap in time, a node's NIC family or CPU model changed, or the runs of a path differ in a load parameter |

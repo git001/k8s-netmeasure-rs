@@ -7,6 +7,7 @@
 mod checks;
 mod fmt;
 mod load;
+mod params;
 mod text;
 
 use std::collections::BTreeMap;
@@ -74,6 +75,11 @@ fn report(args: &ReportArgs) -> Result<(), (u8, String)> {
         ));
     }
     let groups = load::by_path(&before, &after);
+    for (path, (bi, ai)) in &groups {
+        let b: Vec<&RunData> = bi.iter().map(|&i| &before[i]).collect();
+        let a: Vec<&RunData> = ai.iter().map(|&i| &after[i]).collect();
+        params::check(path, &b, &a).map_err(|e| (exit::COMPARISON_REFUSED, e))?;
+    }
     let k = groups
         .values()
         .filter(|(b, a)| !b.is_empty() && !a.is_empty())
