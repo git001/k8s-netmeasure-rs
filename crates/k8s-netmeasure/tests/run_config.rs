@@ -70,6 +70,9 @@ fn unreadable_cgroup_refuses_without_the_flag() {
             "20",
             "--warmup",
             "0",
+            // Only the cgroup check is under test; where the cgroup is readable (CI),
+            // the target control port check would refuse the closed port next.
+            "--no-target-control",
         ])
         .args(["--interval", "1ms", "--output", o])
         .assert();
