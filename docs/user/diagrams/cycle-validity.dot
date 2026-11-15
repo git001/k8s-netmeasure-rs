@@ -11,7 +11,7 @@ digraph cycle_validity {
     label="reasons → cycle invalid"; style="rounded"; color="#b23b3b"; fontcolor="#b23b3b"; fontsize=10;
     node [fillcolor="#fdecea", color="#b23b3b"];
     r1 [label="cpu_throttled\nown or ancestor cgroup throttled"];
-    r2 [label="listener_drops\nSYN dropped at own or target listener"];
+    r2 [label="listener_drops\nSYN dropped at own or target listener\n(socket and netns counters rose)"];
     r3 [label="listener_drops_suspected\nno SO_MEMINFO, netns counters rose"];
     r4 [label="target_set_changed\ntarget restarted, rebooted or unreachable"];
     r5 [label="sample_count_short\nlocal_error, anomaly or missing slot"];
@@ -24,13 +24,14 @@ digraph cycle_validity {
     a1 [label="scheduling_jitter\nlateness p99 > 1 ms or max > 10 ms"];
     a2 [label="pacing_overrun\n> 5 % of slots overran"];
     a3 [label="netns_listen_drops\nanother listener in the netns dropped"];
+    a9 [label="listener_drops_not_syn\nsocket drops without lost SYN\n(embryonic resets)"];
     a4 [label="nic_path_unknown\nNIC path not observable"];
     a5 [label="cpu_throttle_unchecked\n--no-cgroup-check"];
     a6 [label="target_unchecked\n--no-target-control"];
     a7 [label="node_context_unavailable\nnode listener did not answer"];
     a8 [label="node_listener_mismatch\nnode listener on another boot id"];
   }
-  facts -> a8 [style=dashed]; facts -> a7 [style=dashed]; facts -> a6 [style=dashed]; facts -> a5 [style=dashed]; facts -> a4 [style=dashed];
+  facts -> a9 [style=dashed]; facts -> a8 [style=dashed]; facts -> a7 [style=dashed]; facts -> a6 [style=dashed]; facts -> a5 [style=dashed]; facts -> a4 [style=dashed];
   facts -> a3 [style=dashed]; facts -> a2 [style=dashed]; facts -> a1 [style=dashed];
   facts -> r7; facts -> r6; facts -> r5; facts -> r4; facts -> r3; facts -> r2; facts -> r1;
 }

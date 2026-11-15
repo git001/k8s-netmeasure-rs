@@ -98,6 +98,10 @@ or Ingress.
    `curl` from a workstation or jump host to the node IPs often fails: an HTTP proxy
    (`http_proxy`) or a firewall answers instead, and `jq` reports a parse error. If
    you need it, use `curl --noproxy '*'`.
+   The overlay `listen` pods only accept traffic from pods labelled
+   `app.kubernetes.io/component=run-overlay` (the NetworkPolicy); for a manual
+   `curl` or `probe` against them start a short-lived pod with that label, e.g.
+   `oc -n netmeasure run nm-debug --image=<image> --labels=app.kubernetes.io/name=k8s-netmeasure,app.kubernetes.io/component=run-overlay --command -- sleep 3600`.
    On OpenShift a project default node selector (`openshift.io/node-selector`) can
    restrict the DaemonSets to fewer nodes than all workers; check
    `oc get ds -n netmeasure`.
@@ -117,9 +121,18 @@ or Ingress.
 6. For the next run delete the Job first (its pod template is immutable), change
    `PHASE`, apply again. Delete the namespace when the test series is over.
 
-The Jobs use requests = limits (1 CPU, Guaranteed QoS), `backoffLimit: 0` (a
-measurement is never retried automatically) and `terminationGracePeriodSeconds: 30`.
-A ReadWriteOnce volume serialises Jobs on different source nodes; use ReadWriteMany
+The Jobs use a CPU limit of 1 (the quota `run` checks) with a request of 500m,
+`backoffLimit: 0` (a measurement is never retried automatically) and
+`terminationGracePeriodSeconds: 30`. On a busy node a full CPU is often not free as
+a request (`Insufficient cpu`); the request only reserves capacity, while throttling
+during a cycle makes it invalid (`cpu_throttled`). Where a full CPU is free,
+requests = limits gives Guaranteed QoS.
+
+The results volume uses the default storage class unless `storageClassName` is set
+in `pvc-results.yaml`. With zonal block storage (cloud disks) choose a class with
+`volumeBindingMode: WaitForFirstConsumer`, so the disk is created in the zone of the
+first Job pod; it stays there, so Jobs in other zones need their own claim. A
+ReadWriteOnce volume serialises Jobs on different source nodes; use ReadWriteMany
 or one claim per Job for concurrent runs.
 
 ## Overlay with a node listener

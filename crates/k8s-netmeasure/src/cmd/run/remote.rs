@@ -132,6 +132,7 @@ pub fn diagnostics(
             aborted: get(|s| Some(s.listener.aborted)),
             netns_listen_drops: get(|s| s.netns_listen_drops),
             netns_listen_overflows: get(|s| s.netns_listen_overflows),
+            netns_embryonic_rsts: get(|s| s.netns_embryonic_rsts),
         },
         get(|s| s.listener.sk_drops.map(u64::from)),
     )

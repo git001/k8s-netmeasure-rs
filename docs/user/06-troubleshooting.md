@@ -22,7 +22,7 @@ The reasons are in `measurement.cycles[].validity.reasons` and in the WARN log l
 | Reason | Usual cause | What to do |
 |---|---|---|
 | `cpu_throttled` | the measuring pod hit its CPU limit | raise the CPU limit; check other containers in the pod |
-| `listener_drops` | an accept queue overflowed: own loopback listener or a target | check other load on the target; raise `--backlog` and `net.core.somaxconn` |
+| `listener_drops` | a listener dropped SYNs (accept queue full): own loopback listener or a target; both the socket's and the namespace's drop counters rose | check other load on the target; raise `--backlog` and `net.core.somaxconn` |
 | `listener_drops_suspected` | the kernel does not expose per-socket drops, and the namespace counters rose | see `selftest` `listener-drop-indicator` |
 | `target_set_changed` | a target restarted, its node rebooted, or its control port stopped answering | check the target pod; restart the run |
 | `sample_count_short` | `local_error` or `anomaly` samples, or slots missing | see `errno` in the file; `EMFILE` → raise the fd limit; `EADDRNOTAVAIL` → ephemeral ports exhausted |
@@ -30,6 +30,7 @@ The reasons are in `measurement.cycles[].validity.reasons` and in the WARN log l
 | `interrupted` | the run was stopped | — |
 
 Annotations (`scheduling_jitter`, `pacing_overrun`, `netns_listen_drops`,
+`listener_drops_not_syn`,
 `nic_path_unknown`, `node_context_unavailable`, `node_listener_mismatch`,
 `cpu_throttle_unchecked`, `target_unchecked`) do not invalidate a cycle; they explain conditions that may matter when results are compared.
 
@@ -45,6 +46,8 @@ Annotations (`scheduling_jitter`, `pacing_overrun`, `netns_listen_drops`,
 | `node listener … sees no physical interface` | the node listener does not run with `hostNetwork` | start it with `hostNetwork` |
 | `--control-bind auto: no interface with an IPv4 default route` | unusual network setup | set `--control-bind` explicitly |
 | `Permission denied` on the report or result file | the working directory is not writable for the pod's UID | write to `/tmp` or a volume |
+| Job pod `Pending`: `Insufficient cpu` | the CPU requests on the source node are fully booked | lower `requests.cpu` (the limit, ≥ 500m, is what `run` checks) or choose another source node |
+| Job pod `Pending`: `unbound immediate PersistentVolumeClaims` | volume still provisioning, or no default storage class | wait a moment; else set `storageClassName` (zonal disks: `WaitForFirstConsumer`) |
 | `CreateContainerError` … `image not known` | the image reference is a `sha256-…` tag (signature/attestation), not the image | use `digest: sha256:…` or a `sha-<commit>` tag |
 | `GLIBC_2.xx not found` | the dynamic build on an older host | use the static (`musl`) build |
 

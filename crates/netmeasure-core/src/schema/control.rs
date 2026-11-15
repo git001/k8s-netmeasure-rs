@@ -73,6 +73,9 @@ pub struct Snapshot {
     /// `TcpExt.ListenOverflows` / `TcpExt.ListenDrops` of the network namespace.
     pub netns_listen_overflows: Option<u64>,
     pub netns_listen_drops: Option<u64>,
+    /// `TcpExt.EmbryonicRsts`: resets that hit a request socket; they raise
+    /// `sk_drops` without a lost SYN (explains `listener_drops_not_syn`).
+    pub netns_embryonic_rsts: Option<u64>,
     /// Own cgroup's `cpu.stat`.
     pub cpu_stat: Option<CpuStat>,
     pub nic: Sourced<NicPath>,
@@ -107,6 +110,7 @@ mod tests {
             },
             netns_listen_overflows: Some(0),
             netns_listen_drops: None,
+            netns_embryonic_rsts: Some(0),
             cpu_stat: None,
             nic: Sourced::unknown(),
         };

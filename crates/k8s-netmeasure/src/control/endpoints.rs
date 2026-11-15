@@ -67,6 +67,7 @@ fn snapshot(handle: &Handle, instance: &str, nic: &NicCache) -> Snapshot {
         },
         netns_listen_overflows: netstat.get("TcpExt.ListenOverflows").copied(),
         netns_listen_drops: netstat.get("TcpExt.ListenDrops").copied(),
+        netns_embryonic_rsts: netstat.get("TcpExt.EmbryonicRsts").copied(),
         cpu_stat: crate::diag::cgroup::own_file("cpu.stat").map(|t| cgroup::parse_cpu_stat(&t)),
         nic: nic_now(nic),
     }

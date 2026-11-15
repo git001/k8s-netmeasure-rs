@@ -3,6 +3,14 @@
 # ReadWriteOnce is enough when the run Jobs execute one after another (or all on
 # the same node). For concurrent runs on several source nodes use a ReadWriteMany
 # storage class, or one claim per Job.
+#
+# Storage class: without storageClassName the cluster default is used. Zonal block
+# storage (cloud disks) needs a class with volumeBindingMode WaitForFirstConsumer,
+# so the disk is created in the zone of the first Job pod; with Immediate it may
+# land in another zone and the pod cannot mount it. The disk then stays in that
+# zone: Jobs on source nodes in other zones need their own claim.
+# A Job pod may briefly report "unbound immediate PersistentVolumeClaims" while the
+# volume is provisioned; the scheduler retries.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -11,6 +19,7 @@ metadata:
   labels:
     app.kubernetes.io/name: k8s-netmeasure
 spec:
+  # storageClassName: <class>   # see above
   accessModes: ["ReadWriteOnce"]
   resources:
     requests:

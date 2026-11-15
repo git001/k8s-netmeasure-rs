@@ -29,6 +29,7 @@ pub struct TargetDiagnostics {
     pub aborted: Option<u64>,
     pub netns_listen_drops: Option<u64>,
     pub netns_listen_overflows: Option<u64>,
+    pub netns_embryonic_rsts: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

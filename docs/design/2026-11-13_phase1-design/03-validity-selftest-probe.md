@@ -9,7 +9,7 @@ Part of the [Phase 1 design](README.md) · covers §3.6–§3.9 · previous: [Me
 | Reason | Rule | Invalidates? |
 |---|---|---|
 | `cpu_throttled` | `throttled_usec` delta > 0 | yes |
-| `listener_drops` | own or target listener `SK_MEMINFO_DROPS` delta > 0 | yes |
+| `listener_drops` | own or target listener `SK_MEMINFO_DROPS` delta > 0 **and** that namespace's `ListenOverflows/ListenDrops` delta > 0 (or the netns counters unreadable); revised after the first cluster run, see below | yes |
 | `listener_drops_suspected` | fallback, netns counters only | yes |
 | `target_set_changed` | a target's control port reports a different `listener_instance` or `boot_id`, or a target became unreachable on the control port | yes |
 | `sample_count_short` | any `local_error` or `anomaly` (§3.2), or a missing slot | yes |
@@ -18,11 +18,33 @@ Part of the [Phase 1 design](README.md) · covers §3.6–§3.9 · previous: [Me
 | `scheduling_jitter` | p99 of pacing wake-up lateness > **1 ms**, or max > **10 ms** | **annotate only** |
 | `pacing_overrun` | overrun fraction > **5 %** | **annotate only** |
 | `netns_listen_drops` | netns `ListenOverflows/ListenDrops` delta > 0 without own `sk_drops` | annotate only |
+| `listener_drops_not_syn` | `SK_MEMINFO_DROPS` delta > 0, but the namespace's `ListenOverflows/ListenDrops` did not rise: no SYN was lost (typically embryonic resets, see below) | annotate only |
 | `nic_path_unknown` | the NIC path before or after the cycle is `unknown` (pod network namespace without a node listener, §5); added in milestone 3c2 so that an unobserved NIC path is never read as unchanged | annotate only |
 | `cpu_throttle_unchecked` | `--no-cgroup-check` was given (§3.7) | annotate only |
 | `node_context_unavailable` | the node listener (`--node-context-from`, §5) did not answer at a snapshot; the NIC path of that snapshot is unknown | annotate only |
 | `node_listener_mismatch` | the node listener reported another `boot_id`; it is no longer asked, the NIC path stays unknown | annotate only |
 | `target_unchecked` | `--no-target-control`: the targets have no control port, so `target_set_changed`, target listener drops and the targets' NIC path are not checked (milestone 3d) | annotate only |
+
+**`listener_drops` needs both counters** (revised 2026-11-15 after the first run on a
+cluster). The first overlay run across zones marked every cycle `listener_drops`:
+the targets' `sk_drops` rose by 1–11 per cycle (0.2–2 % of connects), although
+every sample was `ok`, no sample had a SYN retransmission, and the targets' pod
+namespaces showed `ListenOverflows` and `ListenDrops` 0. The namespace's
+`TcpExt.EmbryonicRsts` equalled the listener's `sk_drops` exactly (41 = 41). Cause:
+the client closes with RST (`SO_LINGER 0`, §3.1) right after its ACK; when the RST
+reaches the target before the ACK has turned the request socket into a connection,
+the kernel discards it as an embryonic reset and counts it in the listener's
+`sk_drops`. No SYN is lost and the measured connect has already completed; on
+loopback and with single `probe` connects it does not happen. Every SYN-related drop,
+in contrast, goes through `tcp_listendrop()`, which raises `sk_drops` and the
+namespace's `ListenDrops` together. The rule therefore requires both: a real drop of
+the own socket is never missed, and an embryonic reset only annotates
+(`listener_drops_not_syn`). In a hostNetwork namespace the netns counters cover the
+whole node, so a coincidental drop of another listener can still invalidate a cycle;
+that error is on the safe side. `/v1/snapshot` reports `netns_embryonic_rsts`, and
+`diagnostics.cycles[].targets` its delta, so the annotation is explained in the file.
+Closing with FIN instead of RST would avoid the resets but would leave TIME_WAIT
+sockets on the client and change the measured path; rejected.
 
 **NIC path** (added in milestone 2 planning). The same instance type can run on hosts
 with different NIC hardware, and an accelerated-networking VF can be removed and

@@ -83,7 +83,8 @@ formatter. Atomic write: `<path>.tmp-<run_id>` → `fsync` → `rename` → `fsy
   `context_after`; `config.target_control_port`; per cycle
   `quality.listener_drops` as `{ "source": …, "targets": { "1": … } }` as in the
   example above; `diagnostics.cycles[].targets` with the deltas of `accepted`,
-  `aborted`, `netns_listen_drops` and `netns_listen_overflows` per target. A target's
+  `aborted`, `netns_listen_drops`, `netns_listen_overflows` and (added 2026-11-15)
+  `netns_embryonic_rsts` per target. A target's
   `name` is its declared node name if it has one, else its address.
 Fields of later steps (`control`, `load`, `shutdown_deadline_ns`) are added with them
 (3e, milestone 6).

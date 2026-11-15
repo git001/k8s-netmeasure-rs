@@ -7,6 +7,9 @@
 #   this policy, check your CNI's documentation on host-to-pod traffic.
 # - Does not protect the underlay (hostNetwork) pods: NetworkPolicy does not apply
 #   to them.
+# - Manual checks (curl /v1/snapshot, probe) against an overlay listen must come
+#   from a pod with the label app.kubernetes.io/component=run-overlay; from any
+#   other pod the packets are dropped and curl hangs.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

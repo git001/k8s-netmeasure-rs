@@ -137,8 +137,9 @@ throttling (and that of every visible ancestor cgroup with a quota), the SYN dro
 its loopback listener, the network-namespace TCP counters and the NIC path, and
 marks the cycle invalid for `cpu_throttled`, `listener_drops`,
 `listener_drops_suspected`, `sample_count_short`, `nic_changed` or `interrupted`;
-pacing jitter, overruns, foreign listener drops in the namespace and an unobserved
-NIC path are annotations only. Each target is normally a `listen`: `run` reads its
+pacing jitter, overruns, foreign listener drops in the namespace, socket drops
+without a lost SYN (`listener_drops_not_syn`) and an unobserved NIC path are
+annotations only. Each target is normally a `listen`: `run` reads its
 control port (same IP, `--target-control-port`, default 17701) at start and around
 every cycle, and also invalidates a cycle for `target_set_changed` (the target
 restarted, rebooted or stopped answering), for SYN drops at the target's listener

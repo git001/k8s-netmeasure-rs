@@ -76,7 +76,8 @@ spec:
             timeoutSeconds: 2
           resources:
             requests:
-              cpu: 250m
+              # listen only accepts connections; two pods per node.
+              cpu: 100m
               memory: 64Mi
             limits:
               cpu: "1"

@@ -72,11 +72,14 @@ spec:
           #   periodSeconds: 10
           #   failureThreshold: 3
           #   timeoutSeconds: 2
-          # requests = limits: Guaranteed QoS. run refuses a CPU limit below 500m,
-          # because a throttled measuring process measures itself.
+          # run checks the quota (= limit, here 1 CPU) and refuses less than 500m,
+          # because a throttled measuring process measures itself; throttling during
+          # a cycle makes it invalid (cpu_throttled). The request only reserves
+          # capacity: 500m fits on busy nodes, where a full CPU is often not free.
+          # If it is, requests = limits gives Guaranteed QoS.
           resources:
             requests:
-              cpu: "1"
+              cpu: 500m
               memory: 256Mi
             limits:
               cpu: "1"

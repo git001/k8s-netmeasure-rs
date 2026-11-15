@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `listener_drops` invalidates a cycle only if the listener's `SK_MEMINFO_DROPS`
+  **and** its namespace's `ListenOverflows`/`ListenDrops` rose. On a cluster every
+  cycle was invalid although no SYN was lost: the client's RST reached the target's
+  request socket before its ACK (an embryonic reset), which raises `sk_drops` only.
+  Such drops are now the annotation `listener_drops_not_syn`. `/v1/snapshot` reports
+  `netns_embryonic_rsts`, and the result file's target diagnostics its delta.
+- Example manifests: `run` Jobs request 500m CPU with a limit of 1 (a full CPU is
+  often not free as a request on busy nodes), `listen` requests 100m; notes on the
+  storage class (zonal disks need `WaitForFirstConsumer`), on querying overlay
+  listeners past their NetworkPolicy, and the results reader runs on workers only.
+
 - A connect whose socket is already in `CLOSE_WAIT` when `TCP_INFO` is read (the
   target accepted and closed before the check) is `ok`, no longer `anomaly`: that
   state is reachable only after a completed handshake. It is counted as

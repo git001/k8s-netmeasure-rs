@@ -88,21 +88,33 @@ pub fn evaluate(f: &CycleFacts) -> Validity {
     }
 }
 
-/// Own `SK_MEMINFO_DROPS` decides; netns counters only as fallback or annotation.
+/// A listener dropped a SYN (design §3.6, revised after the first cluster run).
+///
+/// Every SYN-related drop of a listener goes through the kernel's `tcp_listendrop()`,
+/// which raises both the socket's `SK_MEMINFO_DROPS` and the namespace's
+/// `TcpExt.ListenDrops`. `sk_drops` alone also rises for an embryonic reset (the
+/// client's RST reaching the request socket before its ACK), which loses no SYN;
+/// so the cycle is invalid only if both rose. In a hostNetwork namespace the netns
+/// counters cover the whole node: a coincidental drop of another listener can still
+/// invalidate, a real drop of ours is never missed.
 fn listener_rule(
     b: &SideCounters,
     a: &SideCounters,
     reasons: &mut Vec<&str>,
     notes: &mut Vec<&str>,
 ) {
-    let netns = delta(b.netns_listen_drops, a.netns_listen_drops).unwrap_or(0)
-        + delta(b.netns_listen_overflows, a.netns_listen_overflows).unwrap_or(0);
-    match delta(b.sk_drops, a.sk_drops) {
-        Some(d) if d > 0 => reasons.push("listener_drops"),
-        Some(_) if netns > 0 => notes.push("netns_listen_drops"),
-        Some(_) => {}
-        None if netns > 0 => reasons.push("listener_drops_suspected"),
-        None => {}
+    let drops = delta(b.netns_listen_drops, a.netns_listen_drops);
+    let overflows = delta(b.netns_listen_overflows, a.netns_listen_overflows);
+    let netns = match (drops, overflows) {
+        (None, None) => None,
+        (d, o) => Some(d.unwrap_or(0) + o.unwrap_or(0)),
+    };
+    match (delta(b.sk_drops, a.sk_drops), netns) {
+        (Some(d), Some(0)) if d > 0 => notes.push("listener_drops_not_syn"),
+        (Some(d), _) if d > 0 => reasons.push("listener_drops"),
+        (Some(_), Some(n)) if n > 0 => notes.push("netns_listen_drops"),
+        (None, Some(n)) if n > 0 => reasons.push("listener_drops_suspected"),
+        _ => {}
     }
 }
 
@@ -246,7 +258,7 @@ mod tests {
         assert_eq!(evaluate(&gone).reasons, vec!["target_set_changed"]);
         let drops = CycleFacts {
             targets: vec![TargetCycle {
-                after: Some(counters(0, 1, 0)),
+                after: Some(counters(0, 1, 1)),
                 ..target()
             }],
             ..facts()
@@ -327,6 +339,31 @@ mod tests {
             evaluate(&suspected).reasons,
             vec!["listener_drops_suspected"]
         );
+    }
+
+    /// Seen on a cluster: the client's RST reached the target's request socket
+    /// before its ACK; `sk_drops` and `EmbryonicRsts` rose, `ListenDrops` did not.
+    #[test]
+    fn socket_drops_without_netns_drops_are_not_syn_drops() {
+        let embryonic = CycleFacts {
+            after: counters(5, 4, 7),
+            ..facts()
+        };
+        let v = evaluate(&embryonic);
+        assert!(v.valid);
+        assert_eq!(v.annotations, vec!["listener_drops_not_syn"]);
+        let target = CycleFacts {
+            targets: vec![TargetCycle {
+                after: Some(counters(0, 3, 0)),
+                ..target()
+            }],
+            ..facts()
+        };
+        assert!(evaluate(&target).valid);
+        let mut unreadable = embryonic.clone();
+        unreadable.before.netns_listen_drops = None;
+        unreadable.before.netns_listen_overflows = None;
+        assert_eq!(evaluate(&unreadable).reasons, vec!["listener_drops"]);
     }
 
     #[test]
