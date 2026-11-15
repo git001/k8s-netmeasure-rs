@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Statistics, milestone 4a (`netmeasure-core::stats`): per-target sample series from
+  result files (valid cycles only, without warm-up, one segment per cycle; timeouts
+  censored, failures and SYN retransmissions counted), the type-1 quantile with
+  censoring (`≥ timeout`), the distribution-free order-statistic interval with its
+  exact binomial coverage, and the tail minimum of 40 expected exceedances with the
+  required sample count below it.
+
 ### Changed
 
 - `run --output` accepts an existing directory and then names the file

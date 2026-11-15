@@ -1,5 +1,5 @@
 //! Quantile estimator (design §10.1): inverse ECDF, Hyndman–Fan type 1,
-//! `x_(⌈np⌉)`, no interpolation. Censoring is added in milestone 4.
+//! `x_(⌈np⌉)`, no interpolation. Censoring is handled in [`super::describe`].
 
 /// Type-1 quantile of **sorted** data; `None` for empty input or `p` outside `(0, 1]`.
 pub fn type1(sorted: &[u64], p: f64) -> Option<u64> {

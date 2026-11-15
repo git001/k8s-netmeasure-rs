@@ -15,7 +15,10 @@ Part of the [Phase 1 design](README.md) · covers §10.1–§10.5 · previous: [
 - **Censoring:** a timeout enters as +∞ (meaning ≥ timeout). If the quantile's order
   statistic is censored, the output is `≥ <timeout>` instead of a number.
 - **Distribution-free CI:** order statistics `(x_(l), x_(u))` with binomial coverage
-  ≥ 95 %. It is labelled honestly: it **assumes independent samples** and is therefore
+  ≥ 95 %: `l` the largest rank with `F(l−1) ≤ 2.5 %`, `u` the smallest with
+  `F(u−1) ≥ 97.5 %`, `F` the CDF of `Binomial(n, p)`; the exact coverage
+  `F(u−1) − F(l−1)` is reported. The CDF is computed exactly in log space in the
+  crate itself (milestone 4a), so this needs no statistics crate. It is labelled honestly: it **assumes independent samples** and is therefore
   optimistic under autocorrelation; it is shown for orientation, never used for a
   verdict.
 - **Tail minimum `m = 40` exceedances** above the quantile per side. Justification:
@@ -29,6 +32,10 @@ Part of the [Phase 1 design](README.md) · covers §10.1–§10.5 · previous: [
     in review round 3, §3.5).
   - Below m, the output is a warning and the required sample count, `n = m / (1 − p)`,
     instead of an interval.
+- **Series** (milestone 4a): per target of a run, the samples of every valid cycle
+  without warm-up, in measurement order, one segment per cycle. `ok` enters as its
+  duration, `timeout` as censored; `refused`/`net_error` count only as failures;
+  `local_error`/`anomaly` (only in invalid cycles) count nowhere.
 
 Wall time below: `pair` mode, 10 ms interval, warm-up 50, loopback every 10th slot
 (§3.4).

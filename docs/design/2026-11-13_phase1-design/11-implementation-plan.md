@@ -35,7 +35,14 @@ milestone ends with something that runs and is reviewed before the next one star
    with the `kube` client (decided in 3e2: the Downward API cannot read node labels).
 4. **Statistics with the simulation suite.** Quantiles, order-statistic CI, block
    bootstrap, verdicts. The §11 acceptance criteria must pass **before** step 5
-   produces any verdict.
+   produces any verdict. Split into five reviewable steps (decided 2026-11-15, after
+   the first cluster baselines): 4a sample series from result files, type-1
+   quantiles with censoring, order-statistic interval, tail minimum; 4b stationary
+   block bootstrap with Politis–White block length; 4c replication levels,
+   comparison and verdicts, failure rates; 4d simulation suite (smoke grid per push,
+   full grid weekly); 4e semi-synthetic check against real runs (harness committed,
+   data local only). The evidence label (§10.5) and the NIC-family analysis (§10.7)
+   belong to step 5.
 5. **`report`.** Declared designs and factors, crossover, comparability, NIC-family
    stratification and the kernel × NIC interaction (§10.7), text and JSON output.
 6. **Background load, underlay diagnostics (ethtool, netstat), README.** The ethtool
