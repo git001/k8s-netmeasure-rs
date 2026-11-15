@@ -43,6 +43,8 @@ with a `run.log` if the Job produced nothing).
 | `SAMPLES` | `1000` | counted samples per target and run |
 | `OUT` | `./mesh-results` | local result directory |
 | `TIMEOUT_S` | `900` | seconds to wait for one round |
+| `PENDING_S` | `120` | give up on a Job pod that is still `Pending` (e.g. `Insufficient cpu`), log the scheduler's reason |
+| `RUN_CPU_REQUEST` | `250m` | CPU request of a run pod; the limit stays 1 CPU, the quota `run` checks |
 | `OC` | `oc` | client binary |
 
 ## What one round does
@@ -53,6 +55,10 @@ with a `run.log` if the Job produced nothing).
   skipped and logged.
 - The Job writes into an `emptyDir`; the pod waits after the run so that the file
   can be copied (`oc cp`), then the Job is deleted. No volume claim is needed.
+- A Job pod that cannot be scheduled within `PENDING_S` (a full node: `Insufficient
+  cpu`) is given up with the scheduler's reason; the round goes on with the other
+  nodes. The request is only 250m: `run` checks the limit (1 CPU), and CPU missing
+  during a cycle shows up as `cpu_throttled` and invalidates it.
 
 ## Load and duration
 
@@ -62,6 +68,6 @@ bytes, no payload. With every node measuring every other node at once, each node
 sends and receives about 100 connections per second, roughly 400 packets per second
 and 30 KB/s, far below what probes, monitoring and logging already produce.
 
-Per node: one `run` pod (request 500m CPU, limit 1) during a round, and two listeners
+Per node: one `run` pod (request 250m CPU, limit 1) during a round, and two listeners
 (100m each) for the whole series. With `n` nodes and the default 1000 samples, a
 round takes about `1050 × (n − 1) × 11 ms`: about 2 min for 12 nodes.

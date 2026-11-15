@@ -22,7 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hand-edited manifests. It deploys the listeners (with optional node labels and
   tolerations from the environment), finds the listener addresses, runs one Job per
   source node in parallel, overlay and underlay alternating in rounds, copies the
-  result files out of an `emptyDir` and deletes the Jobs.
+  result files out of an `emptyDir` and deletes the Jobs. `inventory` prints one
+  line per node (kernel, NIC drivers with ring sizes); a Job pod still `Pending`
+  after `PENDING_S` is given up with the scheduler's reason; run pods request
+  `RUN_CPU_REQUEST` (250m) with a limit of 1 CPU.
 - README: acknowledgement line.
 
 - Statistics, milestone 4a (`netmeasure-core::stats`): per-target sample series from

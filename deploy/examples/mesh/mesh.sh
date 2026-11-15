@@ -15,6 +15,10 @@
 #   SAMPLES        counted samples per target and run (default: 1000)
 #   OUT            local result directory (default: ./mesh-results)
 #   TIMEOUT_S      seconds to wait for one round (default: 900)
+#   PENDING_S      give up on a Job pod still Pending after this many seconds, e.g.
+#                  `Insufficient cpu` on a full node (default: 120)
+#   RUN_CPU_REQUEST  CPU request of a run pod (default: 250m); the limit stays 1 CPU,
+#                  which is the quota run checks (>= 500m)
 #   OC             client binary (default: oc; kubectl works as well)
 #
 # Never expose `listen` to the internet; this script creates no Service, Route or
@@ -27,6 +31,8 @@ TOLERATIONS=${TOLERATIONS:-[]}
 SAMPLES=${SAMPLES:-1000}
 OUT=${OUT:-./mesh-results}
 TIMEOUT_S=${TIMEOUT_S:-900}
+PENDING_S=${PENDING_S:-120}
+RUN_CPU_REQUEST=${RUN_CPU_REQUEST:-250m}
 OC=${OC:-oc}
 HERE=$(cd "$(dirname "$0")" && pwd)
 LISTEN_DIR=$HERE/../listen
@@ -78,14 +84,20 @@ listeners() {
     awk '$3 == "true" && $2 != "" {print $1, $2}' | sort
 }
 
+# One line per node: kernel, NIC drivers with ring sizes (raw JSON without jq).
 cmd_inventory() {
-  local node ip pod
+  local node ip pod json
   while read -r node ip; do
     pod=$($OC -n "$NS" get pods -l app.kubernetes.io/component=listen-underlay \
       --field-selector "spec.nodeName=$node" -o name | head -n1)
-    printf '%s ' "$node"
-    $OC -n "$NS" exec "$pod" -- curl -s "http://$ip:17701/v1/context"
-    echo
+    json=$($OC -n "$NS" exec "$pod" -- curl -s "http://$ip:17701/v1/context")
+    if command -v jq >/dev/null; then
+      jq -r --arg node "$node" '[$node, .kernel_release.value,
+        ((.nic.value.interfaces // []) | map("\(.driver) \(.rings.rx // "-")/\(.rings.tx // "-")") | join(", "))]
+        | @tsv' <<<"$json"
+    else
+      printf '%s %s\n' "$node" "$json"
+    fi
   done < <(listeners underlay)
 }
 
@@ -154,7 +166,7 @@ EOF
             - name: HOST_IP
               valueFrom: {fieldRef: {fieldPath: status.hostIP}}
           resources:
-            requests: {cpu: 500m, memory: 256Mi}
+            requests: {cpu: $RUN_CPU_REQUEST, memory: 256Mi}
             limits: {cpu: "1", memory: 256Mi}
           securityContext:
             allowPrivilegeEscalation: false
@@ -167,12 +179,19 @@ EOF
 EOF
 }
 
+# The scheduler's last message for a pending pod, e.g. "0/9 nodes are available: …".
+pending_reason() {
+  $OC -n "$NS" get events --field-selector "involvedObject.name=${1#pod/},reason=FailedScheduling" \
+    -o jsonpath='{.items[-1:].message}' 2>/dev/null || echo unknown
+}
+
 cmd_round() { # path phase round
   need_image
   local path=$1 phase=$2 round=$3 node ip i=0 name start pod done_n
   [[ $phase =~ ^[a-z0-9]([a-z0-9-]{0,18}[a-z0-9])?$ ]] || die "phase must be lowercase letters, digits and '-', at most 20 characters"
   [[ $round =~ ^[0-9]{1,3}$ ]] || die "round must be a number"
   local -a nodes=() ips=() names=()
+  local -A job_node=() gave_up=()
   while read -r node ip; do nodes+=("$node") ips+=("$ip"); done < <(listeners "$path")
   if [[ $path == overlay ]]; then # an overlay source needs its node listener
     local -A under=()
@@ -191,13 +210,27 @@ cmd_round() { # path phase round
     name=$(printf 'nm-%s-%s-r%s-n%02d' "${path:0:2}" "$phase" "$round" "$i")
     job_manifest "$name" "$path" "$phase" "$round" "$node" "${targets[@]}" | $OC apply -f - >/dev/null
     names+=("$name")
+    job_node[$name]=$node
   done
   start=$SECONDS
   while :; do
     done_n=0
     for name in "${names[@]}"; do
+      if [[ -n ${gave_up[$name]:-} ]]; then
+        done_n=$((done_n + 1))
+        continue
+      fi
       pod=$($OC -n "$NS" get pods -l "job-name=$name" -o name 2>/dev/null | head -n1)
-      [[ -n $pod ]] && $OC -n "$NS" exec "$pod" -- test -f /results/exit-code 2>/dev/null && done_n=$((done_n + 1))
+      [[ -z $pod ]] && continue
+      if $OC -n "$NS" exec "$pod" -- test -f /results/exit-code 2>/dev/null; then
+        done_n=$((done_n + 1))
+      elif ((SECONDS - start > PENDING_S)) &&
+        [[ $($OC -n "$NS" get "$pod" -o jsonpath='{.status.phase}' 2>/dev/null) == Pending ]]; then
+        log "${job_node[$name]}: gave up, pod still Pending after ${PENDING_S}s: $(pending_reason "$pod")"
+        gave_up[$name]=1
+        $OC -n "$NS" delete job "$name" --wait=false >/dev/null
+        done_n=$((done_n + 1))
+      fi
     done
     ((done_n == ${#names[@]})) && break
     ((SECONDS - start > TIMEOUT_S)) && { log "timeout: $done_n of ${#names[@]} finished"; break; }
@@ -205,8 +238,9 @@ cmd_round() { # path phase round
   done
   local dir rc
   for name in "${names[@]}"; do
+    [[ -n ${gave_up[$name]:-} ]] && continue
     pod=$($OC -n "$NS" get pods -l "job-name=$name" -o name 2>/dev/null | head -n1)
-    node=$($OC -n "$NS" get "$pod" -o jsonpath='{.spec.nodeName}' 2>/dev/null || echo unknown)
+    node=${job_node[$name]}
     dir=$OUT/$phase/$path/round-$round/$node
     mkdir -p "$(dirname "$dir")"
     # oc cp creates $dir itself (it must not exist yet) with the pod's /results.
