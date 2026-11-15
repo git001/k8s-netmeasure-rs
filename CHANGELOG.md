@@ -18,7 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Example manifests: `run` Jobs request 500m CPU with a limit of 1 (a full CPU is
   often not free as a request on busy nodes), `listen` requests 100m; notes on the
   storage class (zonal disks need `WaitForFirstConsumer`), on querying overlay
-  listeners past their NetworkPolicy, and the results reader runs on workers only.
+  listeners past their NetworkPolicy, on taking the current target pod IPs before
+  each run (a one-liner in the user guide), and the results reader runs on workers
+  only.
 
 - A connect whose socket is already in `CLOSE_WAIT` when `TCP_INFO` is read (the
   target accepted and closed before the check) is `ok`, no longer `anomaly`: that

@@ -108,7 +108,18 @@ or Ingress.
 4. In `run/run-overlay.yaml` (or `run-underlay.yaml`) set the source node
    (`SOURCE-NODE`), the targets (overlay: pod IPs of the overlay `listen` pods;
    underlay: node IPs) and `PHASE`, enable the Job in `run/kustomization.yaml` and
-   apply it:
+   apply it. `run` does not discover targets (Phase 1 reads no API). Overlay targets
+   are pod IPs, which change with every rollout of the DaemonSet: take them right
+   before each run. This prints the `--target` lines for every node except the
+   source (overlay; for underlay use `component=listen-underlay` and
+   `.status.hostIP`):
+   ```sh
+   SRC=<source-node>
+   oc -n netmeasure get pods -l app.kubernetes.io/component=listen-overlay \
+     -o jsonpath='{range .items[?(@.spec.nodeName!="'"$SRC"'")]}{"- --target="}{.status.podIP}{":17700  # "}{.spec.nodeName}{"\n"}{end}'
+   ```
+   A target that no longer answers on its control port refuses the start (exit 3,
+   `target control port check failed`).
    ```sh
    oc apply -k deploy/examples/run
    oc -n netmeasure logs -f job/netmeasure-run-overlay

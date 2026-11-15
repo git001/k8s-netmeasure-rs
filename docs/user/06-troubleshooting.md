@@ -40,7 +40,7 @@ Annotations (`scheduling_jitter`, `pacing_overrun`, `netns_listen_drops`,
 |---|---|---|
 | `CPU quota …m is below the floor of 500m` | pod CPU limit too small | limit ≥ 500m |
 | `cgroup v2 cpu.max/cpu.stat unreadable` | cgroup v1 or an unusual sandbox | `--no-cgroup-check` (throttling then unchecked) |
-| `target control port check failed` | the target is not a `listen`, or its control port is filtered | open 17701, or `--no-target-control` |
+| `target control port check failed` | the target pod was replaced and has a new pod IP (overlay), the target is not a `listen`, or its control port is filtered | take the current pod IPs; open 17701; or `--no-target-control` |
 | `cannot write --output` | the directory does not exist | create it, or write to `/tmp` / a volume |
 | `node listener … is not on this node` | `--node-context-from` points to another node's listener | use the node IP of the pod's own node (`status.hostIP`) |
 | `node listener … sees no physical interface` | the node listener does not run with `hostNetwork` | start it with `hostNetwork` |
