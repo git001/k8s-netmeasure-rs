@@ -8,7 +8,7 @@ digraph run_lifecycle {
   start   [label="start", shape=circle, width=0.5, fillcolor="#dfe9d8", color="#2e7d32"];
   config  [label="parse flags and K8S_NETMEASURE_*\nplan slots and cycles"];
   e2      [label="exit 2\n(usage)", shape=octagon, fillcolor="#fdecea", color="#b23b3b"];
-  checks  [label="start checks:\noutput directory exists?\ncgroup v2 readable, quota ≥ 500m?\n(--no-cgroup-check skips the cgroup part)"];
+  checks  [label="start checks:\noutput directory exists,\noutput file not yet existing?\ncgroup v2 readable, quota ≥ 500m?\n(--no-cgroup-check skips the cgroup part)"];
   signals [label="block SIGTERM/SIGINT before any other thread,\nstart the signal thread"];
   remote  [label="every target's control port answers\n/v1/info and /v1/context?\n(skipped with --no-target-control)"];
   e3b     [label="exit 3\n(refused)", shape=octagon, fillcolor="#fdecea", color="#b23b3b"];
@@ -20,7 +20,7 @@ digraph run_lifecycle {
   cycle   [label="measuring thread runs the cycle\n(paced slots, round-robin, loopback)\non a signal: finish if the rest fits into\n--shutdown-deadline, else end now (interrupted)"];
   after   [label="after-snapshot"];
   valid   [label="decide validity, log one line per target,\nWARN outliers and invalid cycle"];
-  write   [label="read contexts after the run\nwrite result file atomically\n(<output>.tmp-<run_id> → rename)"];
+  write   [label="read contexts after the run\nwrite result file atomically\n(directory: <path>-<node>-<start>-<run_id>.json)"];
   exit    [label="exit code?", shape=diamond, fillcolor="#fff8e1", color="#b08900"];
   e0      [label="0: every cycle valid", shape=box, fillcolor="#dfe9d8", color="#2e7d32"];
   e4      [label="4: at least one\ncycle invalid", shape=box, fillcolor="#fff8e1", color="#b08900"];

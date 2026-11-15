@@ -111,7 +111,9 @@ pub struct RunArgs {
           value_parser = crate::listen::control_bind)]
     pub control_bind: crate::ControlBind,
 
-    /// Result file (JSON, written atomically at the end).
+    /// Result file (JSON, written atomically at the end), or an existing directory:
+    /// then the name is `<path>-<node>-<UTC start>-<run_id>.json`. An existing file is
+    /// never overwritten (exit 3).
     #[arg(long, env = "K8S_NETMEASURE_OUTPUT")]
     pub output: PathBuf,
 

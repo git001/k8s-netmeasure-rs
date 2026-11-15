@@ -4,8 +4,8 @@
 #   - nodeSelector: the source node;
 #   - --target: the pod IPs of the overlay listen pods on the target nodes:
 #       oc -n netmeasure get pods -l app.kubernetes.io/component=listen-overlay -o wide
-#   - PHASE: e.g. baseline, then after the change candidate; it names the file and
-#     is recorded as label phase=<PHASE>.
+#   - PHASE: e.g. baseline, then after the change candidate; recorded as label
+#     phase=<PHASE>. File names are unique anyway (path, node, start time, run_id).
 # A Job's pod template is immutable: delete the Job before applying a changed one.
 apiVersion: batch/v1
 kind: Job
@@ -47,7 +47,9 @@ spec:
             - --path=overlay
             - --label=phase=$(PHASE)
             - --node-context-from=$(HOST_IP):17701
-            - --output=/results/overlay-$(PHASE)-$(NODE_NAME).json
+            # A directory: run names the file <path>-<node>-<UTC start>-<run_id>.json,
+            # so no run overwrites another.
+            - --output=/results/
             # For long runs: probes on an own control port (see below).
             # - --control-port=17702
           env:

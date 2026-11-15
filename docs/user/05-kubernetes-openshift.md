@@ -124,13 +124,20 @@ or Ingress.
    oc apply -k deploy/examples/run
    oc -n netmeasure logs -f job/netmeasure-run-overlay
    ```
-5. Fetch the result: enable `results-reader.yaml`, apply again, then
+   Enable only one Job at a time: two Jobs on one source node disturb each other's
+   measurement. `run` writes `/results/<path>-<node>-<UTC start>-<run_id>.json`, so
+   no run overwrites another.
+5. Fetch the results: enable `results-reader.yaml`, apply again, then
    ```sh
    oc -n netmeasure exec netmeasure-results-reader -- ls /results
    oc -n netmeasure cp netmeasure-results-reader:/results ./results
+   oc -n netmeasure delete pod netmeasure-results-reader
    ```
-6. For the next run delete the Job first (its pod template is immutable), change
-   `PHASE`, apply again. Delete the namespace when the test series is over.
+   Delete the reader afterwards and disable it again: with a ReadWriteOnce volume it
+   holds the disk, and the next Job cannot start (`Multi-Attach error`).
+6. For the next run delete the Job first (its pod template is immutable), set
+   `PHASE` (the label that tells baseline from candidate), apply again. Delete the
+   namespace when the test series is over.
 
 The Jobs use a CPU limit of 1 (the quota `run` checks) with a request of 500m,
 `backoffLimit: 0` (a measurement is never retried automatically) and

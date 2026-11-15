@@ -10,6 +10,14 @@ One JSON document. The header stays human-readable (pretty-printed objects); num
 sample columns are written as one compact array per line by a custom `serde_json`
 formatter. Atomic write: `<path>.tmp-<run_id>` → `fsync` → `rename` → `fsync(dir)`.
 
+**Never overwritten** (added 2026-11-15 after the first cluster runs, where a reused
+file name silently replaced an earlier baseline): `--output` is either an existing
+directory, in which `run` names the file `<path>-<node>-<UTC start
+YYYYMMDDTHHMMSSZ>-<run_id>.json` (node name sanitised to `[A-Za-z0-9._-]`,
+`unknown-node` if undeclared), or a file name that must not exist yet; an existing
+file refuses the start (exit 3). The check runs at start, before anything is
+measured.
+
 ```jsonc
 {
   "schema": "k8s-netmeasure/result", "schema_version": 1,

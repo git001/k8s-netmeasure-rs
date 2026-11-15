@@ -3,7 +3,7 @@
 [User guide](README.md) · previous: [`listen`](03-listen.md) · next: [Running in Kubernetes and OpenShift](05-kubernetes-openshift.md)
 
 ```sh
-k8s-netmeasure run --target 10.0.0.5:17700 [--target 10.0.0.6:17700 ...] --output result.json \
+k8s-netmeasure run --target 10.0.0.5:17700 [--target 10.0.0.6:17700 ...] --output results/ \
     [--samples 5000] [--warmup 50] [--interval 10ms] [--loopback-every 10] \
     [--cycles 10 | --cycle 20s] [--timeout 5s] [--outlier-threshold 20ms] \
     [--path overlay|underlay] [--label k=v ...] [--backlog 4096] \
@@ -34,7 +34,7 @@ k8s-netmeasure run --target 10.0.0.5:17700 [--target 10.0.0.6:17700 ...] --outpu
 | `--node-context-from` | none | node listener for the own NIC path (overlay pods); see [Concepts](01-concepts.md#paths-overlay-and-underlay) |
 | `--shutdown-deadline` | 10s | after SIGTERM/SIGINT the running cycle is finished if it fits into this time, else it ends at once |
 | `--control-port`, `--control-bind` | off, `auto` | probes and `/v1/*` for a long `run` Job, same endpoints as `listen`; a set port that cannot be bound is exit 3 |
-| `--output` | required | result file; its directory must exist |
+| `--output` | required | an existing directory (the file is named `<path>-<node>-<UTC start>-<run_id>.json`), or a new file name; an existing file is never overwritten |
 
 Duration at the defaults with one target: `(5000 + 50) × 10 ms × 10/9` ≈ 56 s. With
 `n` targets it is about `n` times longer.
@@ -43,7 +43,7 @@ Duration at the defaults with one target: `(5000 + 50) × 10 ms × 10/9` ≈ 56 
 
 `run` refuses to start (exit 3) when
 
-- the directory of `--output` does not exist;
+- the directory of `--output` does not exist, or `--output` names a file that exists;
 - the cgroup v2 CPU files are unreadable (unless `--no-cgroup-check`) or the CPU quota
   is below 500 millicores: a throttled measuring process measures itself;
 - a target's control port does not answer (unless `--no-target-control`);

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `run --output` accepts an existing directory and then names the file
+  `<path>-<node>-<UTC start>-<run_id>.json`; an existing file is never overwritten
+  (exit 3). On a cluster a reused file name had silently replaced an earlier
+  baseline. The example Jobs write to `/results/`.
+
 - `listener_drops` invalidates a cycle only if the listener's `SK_MEMINFO_DROPS`
   **and** its namespace's `ListenOverflows`/`ListenDrops` rose. On a cluster every
   cycle was invalid although no SYN was lost: the client's RST reached the target's

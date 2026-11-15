@@ -39,6 +39,14 @@ pub fn rfc3339_ns(unix_ns: i128) -> String {
     }
 }
 
+/// UTC timestamp to the second for file names, e.g. `20261115T024255Z`.
+pub fn compact_utc(unix_ns: i128) -> String {
+    match jiff::Timestamp::from_nanosecond(unix_ns) {
+        Ok(t) => t.strftime("%Y%m%dT%H%M%SZ").to_string(),
+        Err(_) => "invalid-time".to_owned(),
+    }
+}
+
 /// Nanoseconds as `u64`, saturating (≈ 584 years).
 pub fn as_nanos_u64(d: Duration) -> u64 {
     u64::try_from(d.as_nanos()).unwrap_or(u64::MAX)
@@ -55,6 +63,8 @@ mod tests {
             "1970-01-01T00:16:40.000000123Z"
         );
         assert_eq!(rfc3339_ns(i128::MAX), "invalid-time");
+        assert_eq!(compact_utc(1_000_000_000_123), "19700101T001640Z");
+        assert_eq!(compact_utc(i128::MAX), "invalid-time");
     }
 
     #[test]

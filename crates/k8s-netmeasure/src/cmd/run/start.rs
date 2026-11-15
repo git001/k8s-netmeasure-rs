@@ -1,8 +1,9 @@
 //! Everything `run` does before the first cycle (design §3.7, §4.1, §5, §8), in this
-//! order: configuration (exit 2), output directory and CPU checks (exit 3), signal
-//! handling before any other thread, peers (targets' control ports, node listener;
-//! exit 3), the loopback control listener, the own context, and the optional control
-//! port (exit 3 if set and not bindable).
+//! order: configuration (exit 2), output (exit 3: missing directory, existing file)
+//! and CPU checks (exit 3), signal handling before any other thread, peers (targets'
+//! control ports, node listener; exit 3), the loopback control listener, the own
+//! context, the result file name, and the optional control port (exit 3 if set and
+//! not bindable).
 
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::sync::Arc;
@@ -13,6 +14,7 @@ use netmeasure_core::schema::control::NodeContext;
 use netmeasure_core::schema::result::CgroupCheck;
 
 use super::control::{self, Beats, RunControl};
+use super::outpath;
 use super::remote::{self, Remote};
 use super::setup::{self, Setup};
 use super::snapshot;
@@ -37,6 +39,8 @@ pub struct Started {
     /// `(path, path_source)` from the own network namespace.
     pub path: (String, String),
     pub run_id: String,
+    /// The result file: `--output`, or a generated name in that directory.
+    pub output: std::path::PathBuf,
     pub beats: Beats,
     pub control: Option<RunControl>,
 }
@@ -45,13 +49,7 @@ pub struct Started {
 pub fn start(args: &RunArgs) -> Result<Started, (u8, String)> {
     let setup = setup::prepare(args)
         .map_err(|e| (exit::USAGE, format!("invalid run configuration: {e}")))?;
-    let dir = args.output.parent().filter(|p| !p.as_os_str().is_empty());
-    if dir.is_some_and(|d| !d.is_dir()) {
-        return Err((
-            exit::REFUSED,
-            "cannot write --output: the directory does not exist".into(),
-        ));
-    }
+    let output = outpath::check(&args.output).map_err(|e| (exit::REFUSED, e))?;
     let cgroup = snapshot::cgroup_check(args.no_cgroup_check)
         .map_err(|e| (exit::REFUSED, format!("CPU check failed: {e}")))?;
     let internal = |what: &str, e: std::io::Error| (exit::INTERNAL, format!("{what}: {e}"));
@@ -74,6 +72,13 @@ pub fn start(args: &RunArgs) -> Result<Started, (u8, String)> {
         None => own,
     };
     let run_id = ulid::Ulid::generate().to_string();
+    let output = outpath::resolve(
+        output,
+        &path.0,
+        context_before.node_name.value.as_deref(),
+        time::realtime_ns(),
+        &run_id,
+    );
     let now = time::monotonic_ns();
     let beats = Beats {
         main: Arc::new(AtomicU64::new(now)),
@@ -94,6 +99,7 @@ pub fn start(args: &RunArgs) -> Result<Started, (u8, String)> {
         context_before,
         path,
         run_id,
+        output,
         beats,
         control,
     })

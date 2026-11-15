@@ -45,7 +45,9 @@ spec:
             - --target=192.0.2.12:17700
             - --path=underlay
             - --label=phase=$(PHASE)
-            - --output=/results/underlay-$(PHASE)-$(NODE_NAME).json
+            # A directory: run names the file <path>-<node>-<UTC start>-<run_id>.json,
+            # so no run overwrites another.
+            - --output=/results/
             # The node's own NIC is visible here; no --node-context-from needed.
             # --control-port 17702 is on the node IP with hostNetwork; keep it off
             # unless probes are needed.

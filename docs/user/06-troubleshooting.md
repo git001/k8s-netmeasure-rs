@@ -42,6 +42,7 @@ Annotations (`scheduling_jitter`, `pacing_overrun`, `netns_listen_drops`,
 | `cgroup v2 cpu.max/cpu.stat unreadable` | cgroup v1 or an unusual sandbox | `--no-cgroup-check` (throttling then unchecked) |
 | `target control port check failed` | the target pod was replaced and has a new pod IP (overlay), the target is not a `listen`, or its control port is filtered | take the current pod IPs; open 17701; or `--no-target-control` |
 | `cannot write --output` | the directory does not exist | create it, or write to `/tmp` / a volume |
+| `--output … exists; a result file is never overwritten` | the file name was used by an earlier run | give a directory (unique names) or a new file name |
 | `node listener … is not on this node` | `--node-context-from` points to another node's listener | use the node IP of the pod's own node (`status.hostIP`) |
 | `node listener … sees no physical interface` | the node listener does not run with `hostNetwork` | start it with `hostNetwork` |
 | `--control-bind auto: no interface with an IPv4 default route` | unusual network setup | set `--control-bind` explicitly |

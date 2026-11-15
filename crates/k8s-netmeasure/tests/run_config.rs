@@ -84,3 +84,39 @@ fn unreadable_cgroup_refuses_without_the_flag() {
         other => panic!("exit {other:?}: {log}"),
     }
 }
+
+/// A result file is never overwritten; a directory gets a unique generated name.
+#[test]
+fn output_directory_names_and_existing_file_refusal() {
+    let out = out_path("dir");
+    let dir = out.parent().unwrap();
+    let quick = |output: &str| {
+        bin()
+            .args(["run", "--target", &closed_port(), "--samples", "20"])
+            .args(["--warmup", "0", "--interval", "1ms", "--path", "underlay"])
+            .args(["--node-name", "node-a", "--no-cgroup-check"])
+            .args(["--no-target-control", "--output", output])
+            .assert()
+    };
+    let d = format!("{}/", dir.display());
+    quick(&d).code(0);
+    quick(&d).code(0);
+    let names: Vec<String> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(names.len(), 2, "two runs, two files: {names:?}");
+    for n in &names {
+        assert!(
+            n.starts_with("underlay-node-a-") && n.ends_with(".json"),
+            "{n}"
+        );
+        let r = read(&dir.join(n));
+        assert!(n.ends_with(&format!("-{}.json", r.run.run_id)), "{n}");
+    }
+    let existing = dir.join(&names[0]);
+    let before = std::fs::read(&existing).unwrap();
+    let assert = quick(existing.to_str().unwrap()).code(3);
+    assert!(common::stderr(&assert).contains("never overwritten"));
+    assert_eq!(std::fs::read(&existing).unwrap(), before);
+}

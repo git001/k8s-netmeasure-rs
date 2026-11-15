@@ -7,6 +7,7 @@
 mod control;
 mod cycle;
 mod file;
+mod outpath;
 mod remote;
 mod session;
 mod setup;
@@ -46,6 +47,7 @@ pub fn run(args: &RunArgs, sources: &BTreeMap<String, &'static str>) -> ExitCode
         context_before,
         path: (path, path_source),
         run_id,
+        output,
         beats,
         control,
     } = s;
@@ -132,7 +134,7 @@ pub fn run(args: &RunArgs, sources: &BTreeMap<String, &'static str>) -> ExitCode
         samples: measured.samples,
         diagnostics: measured.diagnostics,
     };
-    let written = file::write(&args.output, finished);
+    let written = file::write(&output, finished);
     if let Some(c) = control {
         c.stop();
     }
@@ -142,7 +144,7 @@ pub fn run(args: &RunArgs, sources: &BTreeMap<String, &'static str>) -> ExitCode
             &format!("cannot write the result file: {e}"),
         );
     }
-    tracing::info!(run_id = %run_id, output = %args.output.display(), all_valid, "run finished");
+    tracing::info!(run_id = %run_id, output = %output.display(), all_valid, "run finished");
     match signal {
         Some(s) => exit::code(u8::try_from(shutdown::exit_status(s)).unwrap_or(exit::INTERNAL)),
         None if all_valid => exit::code(exit::OK),
