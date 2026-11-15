@@ -1,6 +1,8 @@
 //! Text output of `report` (design §10.6): header with the declarations, the path
 //! headings with the loopback control (strata: `block.rs`), then the context of both sides ("context, not verdict").
 
+use std::collections::BTreeMap;
+
 use netmeasure_cli::ReportArgs;
 use netmeasure_core::stats::compare::{Comparison, Plan};
 use netmeasure_core::stats::normal::sample_factor;
@@ -8,6 +10,7 @@ use netmeasure_core::stats::verdict::{Margin, Verdict};
 
 use super::checks::Field;
 use super::fmt::{est, iv, ns, pname};
+use super::load::RunData;
 
 /// What has validated the statistical method so far (design §11).
 const VALIDATION: &str =
@@ -65,6 +68,45 @@ pub fn path(path: &str, loopback: &Comparison, strata: usize) {
         lq.relative
             .map_or("-".into(), |r| format!("{:+.1} %", r * 100.0)),
         iv(lq.interval, false)
+    );
+}
+
+/// The sources' NIC counters that increased (diagnostics, never a verdict), summed
+/// over the runs of each side; the largest 8 by name, then a count.
+pub fn nic(before: &[&RunData], after: &[&RunData]) {
+    let side = |runs: &[&RunData]| -> String {
+        let read: Vec<&BTreeMap<String, u64>> =
+            runs.iter().filter_map(|r| r.nic.as_ref()).collect();
+        if read.is_empty() {
+            return "not recorded".into();
+        }
+        let mut sum: BTreeMap<&str, u64> = BTreeMap::new();
+        for m in &read {
+            for (k, v) in *m {
+                *sum.entry(k.as_str()).or_default() += v;
+            }
+        }
+        let mut top: Vec<(&str, u64)> = sum.into_iter().collect();
+        top.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+        let mut list: Vec<String> = top
+            .iter()
+            .take(8)
+            .map(|(k, v)| format!("{k} {v}"))
+            .collect();
+        if top.len() > 8 {
+            list.push(format!("+{} more", top.len() - 8));
+        }
+        let list = if list.is_empty() {
+            "no increase".into()
+        } else {
+            list.join(", ")
+        };
+        format!("{list} ({} of {} runs recorded)", read.len(), runs.len())
+    };
+    println!(
+        "NIC counters of the sources (diagnostics, increases over the runs): before: {}; after: {}",
+        side(before),
+        side(after)
     );
 }
 

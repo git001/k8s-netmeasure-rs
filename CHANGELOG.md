@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after `PENDING_S` is given up with the scheduler's reason; run pods request
   `RUN_CPU_REQUEST` (250m) with a limit of 1 CPU.
 - README: acknowledgement line.
+- NIC statistics as diagnostics (milestone 6): `run` and `listen` read the
+  `ethtool -S` counters of the physical interfaces (`ETHTOOL_GSSET_INFO`,
+  `ETHTOOL_GSTRINGS`, `ETHTOOL_GSTATS`; buffers with room for a driver that grows
+  its list, counts checked) and keep those whose name points at trouble (drop,
+  discard, err, miss, over, timeout, full, busy, stop, wake). Per cycle the
+  increases are recorded for the source and every target (`diagnostics…nic`; overlay
+  runs ask the node listener; `/v1/snapshot` carries `nic_stats`). `report` sums the
+  sources' increases per side ("NIC counters of the sources"), or says
+  `not recorded` for older files. Never part of a verdict.
 - `report` counts the source nodes on both sides and on one side only per path (`!`
   line); without a common node the evidence is `exploratory`, because the sequential
   design compares the same nodes and two different node groups differ in more than

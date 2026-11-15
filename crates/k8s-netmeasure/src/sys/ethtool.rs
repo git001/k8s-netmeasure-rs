@@ -50,7 +50,7 @@ pub fn rings(ifname: &str) -> Result<Rings, i32> {
 }
 
 /// `SIOCETHTOOL` on `ifname` with `data` pointing to an ethtool command struct.
-fn ioctl(ifname: &str, data: *mut libc::c_char) -> Result<(), i32> {
+pub(super) fn ioctl(ifname: &str, data: *mut libc::c_char) -> Result<(), i32> {
     let name = ifname.as_bytes();
     if name.is_empty() || name.len() >= libc::IFNAMSIZ || name.contains(&0) {
         return Err(libc::EINVAL);

@@ -1,7 +1,8 @@
 //! Pure parsers for diagnostics read by the binary (cgroup v2, `/proc/cpuinfo`,
-//! `/proc/net/netstat`, `/proc/net/route`).
+//! `/proc/net/netstat`, `/proc/net/route`) and the selection of NIC statistics.
 
 pub mod cgroup;
 pub mod cpuinfo;
 pub mod netstat;
+pub mod nicstats;
 pub mod route;

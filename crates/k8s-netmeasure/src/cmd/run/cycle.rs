@@ -1,7 +1,7 @@
 //! After a cycle (design §3.5, §3.6, §9.3): validity, quality figures, the cycle record
 //! and its log lines. Runs on the main thread, never inside the timed section.
 
-use netmeasure_core::diag::netstat;
+use netmeasure_core::diag::{netstat, nicstats};
 use netmeasure_core::measure::outcome::Outcome;
 use netmeasure_core::measure::record::flag;
 use netmeasure_core::measure::validity::{self, CycleFacts, delta};
@@ -77,6 +77,7 @@ pub fn record(d: Done<'_>) -> (Cycle, CycleDiagnostics) {
         cycle_id: cycle_id.clone(),
         source: SourceDiagnostics {
             netstat: netstat::delta(&d.before.netstat, &d.after.netstat),
+            nic: nicstats::delta_if_read(&d.before.nic_stats, &d.after.nic_stats),
         },
         targets: remote::by_index(d.remotes, target_diag),
     };

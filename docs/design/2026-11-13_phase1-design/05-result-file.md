@@ -94,6 +94,16 @@ measured.
   `aborted`, `netns_listen_drops`, `netns_listen_overflows` and (added 2026-11-15)
   `netns_embryonic_rsts` per target. A target's
   `name` is its declared node name if it has one, else its address.
+- milestone 6 (2026-11-15), NIC statistics: `diagnostics.cycles[].source.nic` and
+  `targets[i].nic` hold the selected `ethtool -S` counters that increased during
+  the cycle, per physical interface (`{ "<if>": { "stop_queue": 3 } }`). Selected
+  are counters whose name contains `drop`, `discard`, `err`, `miss`, `over`,
+  `timeout`, `full`, `busy`, `stop` or `wake` (driver-neutral, no vendor list);
+  `u64::MAX` (a driver's "not available") is left out. `{}` means read, nothing
+  increased; an absent field means not read (an older version, a pod network
+  namespace without node listener, or no physical interface). Overlay runs read them
+  from the node listener. `/v1/snapshot` carries the current values as `nic_stats`.
+  They never invalidate a cycle; the NIC *path* (§3.6) is unchanged.
 Fields of later steps (`control`, `load`, `shutdown_deadline_ns`) are added with them
 (3e, milestone 6).
 

@@ -7,6 +7,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use netmeasure_core::diag::nicstats;
 use netmeasure_core::schema::control::NodeContext;
 use netmeasure_core::schema::result::{Config, ResultFile};
 use netmeasure_core::stats::blocklen;
@@ -31,6 +32,12 @@ pub struct RunData {
     pub targets: Vec<TargetSeries>,
     /// Stratum `source family → target family` → the matching targets pooled.
     pub strata: BTreeMap<String, Series>,
+    /// Selected NIC counters of the source that increased, summed over all cycles
+    /// (diagnostics). Targets are left out: in a mesh every node is the target of
+    /// many runs at once, so their sums would count one increase many times.
+    /// `None` when no cycle recorded them (an older version, or no physical
+    /// interface visible).
+    pub nic: Option<BTreeMap<String, u64>>,
     pub loopback: Series,
     /// Floor of the block length in samples of one target series (§10.2).
     pub floor: f64,
@@ -134,6 +141,13 @@ fn prepare(path: PathBuf, file: ResultFile) -> Result<RunData, String> {
             series,
         })
         .collect();
+    let read: Vec<&nicstats::NicCounters> = file
+        .diagnostics
+        .cycles
+        .iter()
+        .filter_map(|c| c.source.nic.as_ref())
+        .collect();
+    let nic = (!read.is_empty()).then(|| nicstats::by_counter(read));
     let ResultFile { run, source, .. } = file;
     Ok(RunData {
         run_id: run.run_id,
@@ -141,6 +155,7 @@ fn prepare(path: PathBuf, file: ResultFile) -> Result<RunData, String> {
         context: source.context_before,
         targets,
         strata: BTreeMap::new(),
+        nic,
         loopback,
         floor,
         loopback_floor,

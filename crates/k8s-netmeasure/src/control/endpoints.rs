@@ -70,6 +70,7 @@ fn snapshot(handle: &Handle, instance: &str, nic: &NicCache) -> Snapshot {
         netns_embryonic_rsts: netstat.get("TcpExt.EmbryonicRsts").copied(),
         cpu_stat: crate::diag::cgroup::own_file("cpu.stat").map(|t| cgroup::parse_cpu_stat(&t)),
         nic: nic_now(nic),
+        nic_stats: net::nic_stats(),
     }
 }
 

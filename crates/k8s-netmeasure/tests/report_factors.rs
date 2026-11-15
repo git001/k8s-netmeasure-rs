@@ -81,3 +81,31 @@ fn different_source_nodes_are_observational() {
         assert!(out.contains(want), "missing `{want}` in:\n{out}");
     }
 }
+
+#[test]
+fn source_nic_counters_are_summed_per_side() {
+    let l = start();
+    let (before, after) = dirs("nic-counters");
+    run(&l, &before, "200");
+    run(&l, &after, "200");
+    context(&before, 256, "k1");
+    context(&after, 1024, "k1");
+    let set = |dir: &Path, nic: serde_json::Value| {
+        edit(dir, |v| {
+            for c in v["diagnostics"]["cycles"].as_array_mut().unwrap() {
+                c["source"]["nic"] = nic.clone();
+            }
+        });
+    };
+    set(
+        &before,
+        serde_json::json!({"vf0": {"stop_queue": 2, "wake_queue": 2}}),
+    );
+    set(&after, serde_json::json!({}));
+    let out = stdout(&report(&before, &after).code(0));
+    assert!(
+        out.contains("before: stop_queue ")
+            && out.contains("(1 of 1 runs recorded); after: no increase (1 of 1 runs recorded)"),
+        "{out}"
+    );
+}

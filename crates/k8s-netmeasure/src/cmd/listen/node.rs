@@ -39,7 +39,7 @@ impl Node {
     }
 
     pub fn refresh(&mut self) {
-        let (nic, _) = self.listener.nic(&mut self.client);
+        let (nic, _, _) = self.listener.nic(&mut self.client);
         if let Ok(mut c) = self.cache.lock() {
             *c = nic;
         }

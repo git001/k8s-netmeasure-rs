@@ -64,7 +64,7 @@ line each. Main parts:
 | `targets` | index 0 = loopback control; then every target with address, control port, `listener_instance` and context before and after |
 | `measurement.cycles` | per cycle: sample range, times, `validity` (`valid`, `reasons`, `annotations`), pacing quality, CPU throttling, SYN drops per side |
 | `measurement.samples` | columns: `target`, `late_ns`, `duration_ns`, `result`, `syn_retrans` (-1 = unknown), `flags`; sparse `errno` and `reanchor` |
-| `diagnostics` | per cycle: namespace TCP counters that increased, target counter deltas |
+| `diagnostics` | per cycle: namespace TCP counters that increased, target counter deltas, NIC counters that increased (`source.nic`, `targets[i].nic`: names containing drop, discard, err, miss, over, timeout, full, busy, stop or wake from `ethtool -S` of the physical interfaces; `{}` read but nothing increased, absent not read) |
 
 `flags` bits: 1 `sync_connect`, 2 warm-up, 4 started after an overrun, 8 `EINTR`,
 16 `peer_closed`. `result` codes are listed in `result_codes`.

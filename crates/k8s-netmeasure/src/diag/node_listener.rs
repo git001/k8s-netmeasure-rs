@@ -4,6 +4,7 @@
 
 use std::net::SocketAddrV4;
 
+use netmeasure_core::diag::nicstats::NicCounters;
 use netmeasure_core::measure::validity::NodeListener as State;
 use netmeasure_core::schema::control::{NodeContext, Snapshot};
 use netmeasure_core::schema::nic::NicPath;
@@ -54,22 +55,27 @@ impl NodeListener {
         ))
     }
 
-    /// The node's NIC path now, from its `/v1/snapshot`.
-    pub fn nic(&mut self, client: &mut Client) -> (Sourced<NicPath>, State) {
+    /// The node's NIC path and selected NIC statistics now, from its `/v1/snapshot`.
+    pub fn nic(&mut self, client: &mut Client) -> (Sourced<NicPath>, NicCounters, State) {
+        let none = |state| (Sourced::unknown(), NicCounters::new(), state);
         if self.mismatched {
-            return (Sourced::unknown(), State::Mismatch);
+            return none(State::Mismatch);
         }
         match client.get::<Snapshot>(self.addr, "/v1/snapshot") {
             Err(e) => {
                 tracing::warn!(node_listener = %self.addr, error = %e, "node listener unreachable; NIC path unknown");
-                (Sourced::unknown(), State::Unavailable)
+                none(State::Unavailable)
             }
             Ok(s) if s.boot_id.as_deref() != Some(self.boot_id.as_str()) => {
                 tracing::warn!(node_listener = %self.addr, "node listener reports another boot id; no longer used");
                 self.mismatched = true;
-                (Sourced::unknown(), State::Mismatch)
+                none(State::Mismatch)
             }
-            Ok(s) => (Sourced::via_node_listener(s.nic.value), State::Ok),
+            Ok(s) => (
+                Sourced::via_node_listener(s.nic.value),
+                s.nic_stats,
+                State::Ok,
+            ),
         }
     }
 }

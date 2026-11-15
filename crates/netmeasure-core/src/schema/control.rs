@@ -1,11 +1,14 @@
 //! Control-port bodies (design §7): `/v1/info`, `/v1/context` and `/v1/snapshot`.
 //! `listen` writes them; `run` reads them with `deny_unknown_fields` (§9.1).
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use super::nic::NicPath;
 use super::sourced::Sourced;
 use crate::diag::cgroup::{CpuMax, CpuStat};
+use crate::diag::nicstats::NicCounters;
 
 pub const SCHEMA: &str = "k8s-netmeasure/control";
 pub const SCHEMA_VERSION: u32 = 1;
@@ -79,6 +82,10 @@ pub struct Snapshot {
     /// Own cgroup's `cpu.stat`.
     pub cpu_stat: Option<CpuStat>,
     pub nic: Sourced<NicPath>,
+    /// Selected `ethtool -S` counters of the physical interfaces this process sees
+    /// (`diag::nicstats`); empty in a pod network namespace.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub nic_stats: NicCounters,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -113,10 +120,19 @@ mod tests {
             netns_embryonic_rsts: Some(0),
             cpu_stat: None,
             nic: Sourced::unknown(),
+            nic_stats: NicCounters::new(),
         };
         let mut v = serde_json::to_value(&s).unwrap();
         assert_eq!(v["nic"]["source"], "unknown");
+        // Empty NIC statistics are left out, and a snapshot without them still reads.
+        assert!(v.get("nic_stats").is_none());
         assert_eq!(serde_json::from_value::<Snapshot>(v.clone()).unwrap(), s);
+        let mut with = s.clone();
+        with.nic_stats
+            .insert("vf0".into(), [("stop_queue".into(), 3)].into());
+        let w = serde_json::to_value(&with).unwrap();
+        assert_eq!(w["nic_stats"]["vf0"]["stop_queue"], 3);
+        assert_eq!(serde_json::from_value::<Snapshot>(w).unwrap(), with);
         v["surprise"] = 1.into();
         assert!(serde_json::from_value::<Snapshot>(v).is_err());
     }

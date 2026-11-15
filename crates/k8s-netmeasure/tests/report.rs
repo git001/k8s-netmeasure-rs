@@ -37,6 +37,7 @@ fn sequential_kernel_report_on_real_runs() {
         "evidence: exploratory",
         "p90",
         "local control (loopback median)",
+        "NIC counters of the sources (diagnostics",
         "the declared factor did not change",
         "seed 1",
     ] {

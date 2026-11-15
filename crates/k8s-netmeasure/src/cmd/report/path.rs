@@ -124,6 +124,7 @@ pub fn report(path: &str, b: &Prepared, a: &Prepared, plan: &Plan) {
              (the sequential design compares the same nodes)"
         );
     }
+    text::nic(&b.runs, &a.runs);
     for s in &both {
         let result = StratumResult {
             stratum: s,

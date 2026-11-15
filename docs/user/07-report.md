@@ -74,6 +74,12 @@ rationale down: chosen afterwards, they can be fitted to the result.
   comparison of two node groups, which differ in more than the declared factor).
 - `failures` gets its own verdict only from 10 failures on both sides together; SYN
   retransmissions are diagnostics only.
+- `NIC counters of the sources`: the `ethtool -S` counters of the measuring nodes
+  that increased during the runs (stopped/woken TX queues, drops, errors, …), summed
+  per side, the largest 8 first. Diagnostics, never a verdict: they can explain a
+  change in the tail, e.g. a TX ring that runs full. `not recorded` for files of an
+  older version. The targets' counters are in the result files but not summed here:
+  in a mesh every node is the target of many runs at once.
 - `local control`: the median of the loopback control. A significant shift means
   the measuring machine itself changed; weigh its size against the effect.
 - `between-run spread`: the primary quantile of every run; if it is wide, more runs

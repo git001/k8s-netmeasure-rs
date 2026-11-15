@@ -5,6 +5,7 @@
 use std::collections::BTreeMap;
 use std::net::SocketAddrV4;
 
+use netmeasure_core::diag::nicstats;
 use netmeasure_core::measure::validity::{SideCounters, TargetCycle, delta};
 use netmeasure_core::schema::control::{self, Info, NodeContext, Snapshot};
 use netmeasure_core::schema::nic::NicPath;
@@ -133,6 +134,9 @@ pub fn diagnostics(
             netns_listen_drops: get(|s| s.netns_listen_drops),
             netns_listen_overflows: get(|s| s.netns_listen_overflows),
             netns_embryonic_rsts: get(|s| s.netns_embryonic_rsts),
+            nic: before
+                .zip(after)
+                .and_then(|(b, a)| nicstats::delta_if_read(&b.nic_stats, &a.nic_stats)),
         },
         get(|s| s.listener.sk_drops.map(u64::from)),
     )

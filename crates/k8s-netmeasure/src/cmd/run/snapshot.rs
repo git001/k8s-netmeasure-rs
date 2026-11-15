@@ -5,6 +5,7 @@
 use std::collections::BTreeMap;
 
 use netmeasure_core::diag::cgroup::{ancestor_throttling, floor_millicores};
+use netmeasure_core::diag::nicstats::NicCounters;
 use netmeasure_core::measure::validity::{NodeListener as NodeListenerState, SideCounters};
 use netmeasure_core::schema::control::Snapshot;
 use netmeasure_core::schema::nic::NicPath;
@@ -21,6 +22,8 @@ pub struct Snap {
     pub counters: SideCounters,
     pub netstat: BTreeMap<String, u64>,
     pub nic: Sourced<NicPath>,
+    /// Selected NIC statistics (own, or the node listener's in the overlay variant).
+    pub nic_stats: NicCounters,
     /// One per target with a control port; `None` where it did not answer.
     pub targets: Vec<Option<Snapshot>>,
     pub node_listener: NodeListenerState,
@@ -42,9 +45,13 @@ pub fn take(
         .filter_map(throttled)
         .collect();
     let netstat = net::netstat();
-    let (nic, node_listener) = match node {
+    let (nic, nic_stats, node_listener) = match node {
         Some(n) => n.nic(client),
-        None => (context::nic_path(), NodeListenerState::NotUsed),
+        None => (
+            context::nic_path(),
+            net::nic_stats(),
+            NodeListenerState::NotUsed,
+        ),
     };
     Snap {
         counters: SideCounters {
@@ -56,6 +63,7 @@ pub fn take(
         },
         netstat,
         nic,
+        nic_stats,
         targets: remote::snapshots(client, remotes),
         node_listener,
     }
