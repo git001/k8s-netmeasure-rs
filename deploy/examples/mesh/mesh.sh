@@ -58,20 +58,42 @@ selector_json() {
   printf '{%s}' "$out"
 }
 
-# Node affinity on metadata.name for NODES; `null` removes an earlier one.
+# Node affinity on metadata.name for NODES, empty without NODES. The API allows only
+# one value per metadata.name expression, so every node gets its own term (terms are
+# ORed).
 affinity_json() {
-  local names=() n
+  local names=() n terms=''
   IFS=',' read -ra names <<<"$NODES"
-  local values=''
   for n in "${names[@]}"; do
     [[ -z $n ]] && continue
-    values+="${values:+,}\"$n\""
+    terms+="${terms:+,}{\"matchFields\":[{\"key\":\"metadata.name\",\"operator\":\"In\",\"values\":[\"$n\"]}]}"
   done
-  if [[ -z $values ]]; then
-    printf 'null'
-  else
-    printf '{"nodeAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchFields":[{"key":"metadata.name","operator":"In","values":[%s]}]}]}}}' "$values"
-  fi
+  [[ -n $terms ]] && printf '{"nodeAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[%s]}}}' "$terms"
+  return 0
+}
+
+# The listener manifests with nodeSelector, tolerations and NODES applied before they
+# reach the cluster: a temporary kustomize overlay with a JSON patch for both
+# DaemonSets, so they are never created on more nodes than selected.
+listen_manifests() {
+  local overlay ops affinity
+  overlay=$(mktemp -d "$HERE/.overlay.XXXXXX")
+  # shellcheck disable=SC2064 # expand now: the variable is local
+  trap "rm -rf '$overlay'" RETURN
+  ops="{\"op\":\"add\",\"path\":\"/spec/template/spec/nodeSelector\",\"value\":$(selector_json)}"
+  ops+=",{\"op\":\"add\",\"path\":\"/spec/template/spec/tolerations\",\"value\":$TOLERATIONS}"
+  affinity=$(affinity_json)
+  [[ -n $affinity ]] && ops+=",{\"op\":\"add\",\"path\":\"/spec/template/spec/affinity\",\"value\":$affinity}"
+  cat >"$overlay/kustomization.yaml" <<EOF
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../listen
+patches:
+  - target: {kind: DaemonSet}
+    patch: '[$ops]'
+EOF
+  $OC kustomize "$overlay" | sed "s|image: ghcr.io/git001/k8s-netmeasure-rs.*|image: $IMAGE|"
 }
 
 # Label selector for `oc get nodes`: worker role plus NODE_SELECTOR.
@@ -88,14 +110,9 @@ cmd_nodes() {
 cmd_deploy() {
   need_image
   $OC apply -f "$LISTEN_DIR/namespace.yaml"
-  $OC kustomize "$LISTEN_DIR" |
-    sed "s|image: ghcr.io/git001/k8s-netmeasure-rs.*|image: $IMAGE|" |
-    $OC apply -f -
-  local ds patch
-  patch="{\"spec\":{\"template\":{\"spec\":{\"nodeSelector\":$(selector_json),\"tolerations\":$TOLERATIONS,\"affinity\":$(affinity_json)}}}}"
-  for ds in netmeasure-listen-underlay netmeasure-listen-overlay; do
-    $OC -n "$NS" patch ds "$ds" --type=merge -p "$patch"
-  done
+  local manifests ds
+  manifests=$(listen_manifests) || die "kustomize failed"
+  $OC apply -f - <<<"$manifests"
   for ds in netmeasure-listen-underlay netmeasure-listen-overlay; do
     $OC -n "$NS" rollout status "ds/$ds" --timeout=300s
   done

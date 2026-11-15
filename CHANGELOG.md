@@ -39,8 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (interval, loopback share, connect timeout, topology) and names each parameter
   set with an example run (design §10.6).
 - Mesh script: `NODES` restricts listeners and runs to named nodes (node affinity on
-  `metadata.name`, still DaemonSets), with a warning for a name that gets no
-  listener; `nodes` lists the candidates with zone and instance type; `inventory`
+  `metadata.name` with one term per node, as the API allows only one value per such
+  expression; still DaemonSets), with a warning for a name that gets no listener.
+  `deploy` applies node selector, tolerations and `NODES` through a temporary
+  kustomize overlay before the DaemonSets are created, so they never start on more
+  nodes than selected, not even when a value is rejected; `nodes` lists the candidates with zone and instance type; `inventory`
   prints zone and instance type from the node labels.
 - `cargo xtask semisynthetic <dir>` (design §11): the semi-synthetic check on real
   result files. Runs of every node are split at random into two pseudo sides, a known

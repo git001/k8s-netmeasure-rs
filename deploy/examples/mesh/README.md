@@ -44,8 +44,11 @@ deploy/examples/mesh/mesh.sh inventory
 deploy/examples/mesh/mesh.sh series types 1      # optional: these nodes measure each other
 ```
 
-The listeners stay DaemonSets; `NODES` becomes a node affinity on `metadata.name`, so
-every named node gets exactly one listener. A name that gets none (misspelt, excluded
+The listeners stay DaemonSets; `NODES` becomes a node affinity on `metadata.name` (one
+term per node), so every named node gets exactly one listener. `deploy` renders the
+listener manifests with a temporary kustomize overlay that already carries
+`NODE_SELECTOR`, `TOLERATIONS` and `NODES`, so the DaemonSets are never created on
+more nodes than selected. A name that gets none (misspelt, excluded
 by `NODE_SELECTOR`, or a taint without toleration) is reported after `deploy`. Running
 `deploy` again without `NODES` returns to all selected nodes.
 
