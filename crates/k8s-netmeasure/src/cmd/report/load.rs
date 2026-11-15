@@ -35,6 +35,9 @@ pub fn load(paths: &[PathBuf]) -> Result<Vec<RunData>, String> {
     }
     files.sort();
     let mut out = Vec::new();
+    // A run counted twice (the same file in two archives) would look like stronger
+    // evidence than it is.
+    let mut seen: BTreeMap<String, PathBuf> = BTreeMap::new();
     for f in files {
         let text = std::fs::read_to_string(&f).map_err(|e| format!("{}: {e}", f.display()))?;
         if !text.contains("\"k8s-netmeasure/result\"") {
@@ -43,6 +46,14 @@ pub fn load(paths: &[PathBuf]) -> Result<Vec<RunData>, String> {
         }
         let file: ResultFile = serde_json::from_str(&text)
             .map_err(|e| format!("{}: not a valid result file: {e}", f.display()))?;
+        if let Some(first) = seen.insert(file.run.run_id.clone(), f.clone()) {
+            return Err(format!(
+                "run {} given twice: {} and {}",
+                file.run.run_id,
+                first.display(),
+                f.display()
+            ));
+        }
         out.push(prepare(f, file)?);
     }
     Ok(out)

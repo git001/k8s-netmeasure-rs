@@ -18,8 +18,10 @@ nodes, then `after`) with the factor `kernel`, and text output. The concurrent d
 with crossover, the other factors, NIC-family strata and JSON output *follow*. The
 statistical method is covered by unit tests and by the smoke grid of the simulation
 suite (8 synthetic scenarios with a known effect, run on every push); the full grid
-and the semi-synthetic check on real runs *follow*. The report header names what has
-validated the method.
+*follows*. On your own data, `cargo xtask semisynthetic <dir>` (in a checkout of the
+repository) checks that the method recovers a known effect imposed on a random half of
+your runs; it needs at least two runs per node, better a mesh series of five rounds.
+The report header names what has validated the method.
 
 ## Declare before you measure
 
@@ -68,5 +70,5 @@ rationale down: chosen afterwards, they can be fitted to the result.
 |---|---|
 | 0 | report produced (whatever the verdict) |
 | 1 | internal error |
-| 2 | usage error: missing `--design`/`--factor`, a margin without rationale, unreadable or invalid files |
+| 2 | usage error: missing `--design`/`--factor`, a margin without rationale, unreadable or invalid files, the same run given twice on one side (e.g. one file in two archives) |
 | 5 | comparison refused: the sides overlap in time, or a node's NIC family or CPU model changed |

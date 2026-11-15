@@ -143,7 +143,17 @@ has produced real baseline runs:
 
 This tests the method against the real dependence structure of the target network.
 The real data stays local and is never committed; the test harness is committed, the
-data is not. The README states that coverage is validated against simulated models
+data is not.
+
+Implemented as `cargo xtask semisynthetic <dir>` (`netmeasure-core/tests/semisynth.rs`,
+outside `ci` because it needs data): per path and source node the runs are split at
+random into two pseudo sides (half and half, the odd run alternating), the second side
+is scaled by ×1.0, ×1.1 and ×1.3, and the full comparison runs per split (p99, ±10 %,
+1000 replicates; `NETMEASURE_SEMISYNTHETIC_SPLITS`, default 100). Coverage below 90 %
+fails; the threshold is looser than the simulation band because the splits of one data
+set are not independent. The harness prints how many distinct splits the data allows
+and says when the coverage is not informative (a single node with two or three runs).
+ The README states that coverage is validated against simulated models
 plus this semi-synthetic check, not proven for every network.
 
 ---

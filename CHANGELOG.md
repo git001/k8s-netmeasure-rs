@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after `PENDING_S` is given up with the scheduler's reason; run pods request
   `RUN_CPU_REQUEST` (250m) with a limit of 1 CPU.
 - README: acknowledgement line.
+- `cargo xtask semisynthetic <dir>` (design §11): the semi-synthetic check on real
+  result files. Runs of every node are split at random into two pseudo sides, a known
+  factor (×1.0, ×1.1, ×1.3) is imposed on one, and the coverage and verdicts of the
+  full comparison are printed; below 90 % coverage it fails. The data is passed by
+  path and never copied into the repository.
+- `report`: the same run given twice on one side (one file in two archives) is a
+  usage error (exit 2) instead of counting twice.
 - `report`: a context field equal on both sides prints as `both:` instead of a lone
   `before:` line.
 - Simulation smoke grid (design §11): 8 synthetic scenarios with a known effect,

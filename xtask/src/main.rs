@@ -30,7 +30,10 @@ gates:
                cargo-auditable, not part of `ci`
 
 tools:
-  changelog <version>   print the CHANGELOG.md section of a release (release notes)";
+  changelog <version>   print the CHANGELOG.md section of a release (release notes)
+  semisynthetic <dir>   semi-synthetic check of the statistics on real result files
+                        below <dir> (design §11); the data stays outside the repository,
+                        NETMEASURE_SEMISYNTHETIC_SPLITS sets the splits (default 100)";
 
 type Gate = fn(&std::path::Path) -> Result<(), String>;
 
@@ -113,6 +116,27 @@ fn musl(root: &std::path::Path) -> Result<(), String> {
     )
 }
 
+/// The real data is passed by path only; nothing of it is copied into the tree.
+fn semisynthetic(root: &std::path::Path, dir: &str) -> Result<(), String> {
+    let dir = std::fs::canonicalize(dir).map_err(|e| format!("{dir}: {e}"))?;
+    proc::cargo_env(
+        root,
+        &[
+            "test",
+            "--release",
+            "--locked",
+            "--package",
+            "netmeasure-core",
+            "--test",
+            "semisynth",
+            "--",
+            "--ignored",
+            "--nocapture",
+        ],
+        &[("NETMEASURE_SEMISYNTHETIC_DIR", dir.as_os_str())],
+    )
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let root = workspace_root();
@@ -123,6 +147,17 @@ fn main() -> ExitCode {
             Ok(()) => ExitCode::SUCCESS,
             Err(e) => {
                 eprintln!("xtask changelog: {e}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    if let [tool, dir] = args.as_slice()
+        && tool == "semisynthetic"
+    {
+        return match semisynthetic(&root, dir) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("xtask semisynthetic: {e}");
                 ExitCode::FAILURE
             }
         };

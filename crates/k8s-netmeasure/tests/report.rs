@@ -108,4 +108,28 @@ fn overlapping_sides_and_usage_errors_are_refused() {
         .args(["--before", "/nonexistent-nm", "--after", b])
         .assert()
         .code(2);
+    // The same run twice on one side (e.g. from two archives) is a usage error.
+    let file = std::fs::read_dir(&before)
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let copy = before.with_file_name("copy");
+    std::fs::create_dir_all(&copy).unwrap();
+    std::fs::copy(&file, copy.join("again.json")).unwrap();
+    let assert = bin()
+        .args(["report", "--design", "sequential", "--factor", "kernel"])
+        .args([
+            "--before",
+            b,
+            "--before",
+            copy.to_str().unwrap(),
+            "--after",
+            b,
+        ])
+        .assert()
+        .code(2);
+    let err = String::from_utf8_lossy(&assert.get_output().stderr).into_owned();
+    assert!(err.contains("given twice"), "{err}");
 }
