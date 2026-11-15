@@ -1,6 +1,6 @@
-//! `report` arguments (design §10.4–§10.6). Phase 1, first step: the sequential
-//! design with the factor `kernel`; the concurrent design, crossover, the other
-//! factors and JSON output follow.
+//! `report` arguments (design §10.4–§10.7). Phase 1 so far: the sequential design
+//! with the factors `kernel` and `nic-settings`; the concurrent design, crossover,
+//! the factors `nic` and `load` and JSON output follow.
 
 use std::path::PathBuf;
 
@@ -16,6 +16,19 @@ pub enum Design {
 pub enum Factor {
     /// The kernel changed between the sides; other context differences are checked.
     Kernel,
+    /// NIC settings (ring sizes) changed on the same nodes; the kernel and the NIC
+    /// family must not change.
+    NicSettings,
+}
+
+impl Factor {
+    /// The name as on the command line.
+    pub fn name(self) -> &'static str {
+        match self {
+            Factor::Kernel => "kernel",
+            Factor::NicSettings => "nic-settings",
+        }
+    }
 }
 
 /// `--equivalence-margin`: `10%` (relative, on the ratio) or `50us` (absolute).
@@ -73,9 +86,9 @@ pub struct ReportArgs {
     pub seed: Option<u64>,
 
     /// Context differences to accept instead of refusing (exit 5), comma-separated:
-    /// `nic_family`, `cpu_model`.
+    /// `nic_family`, `cpu_model`, `kernel_release` (refused only with `nic-settings`).
     #[arg(long, env = "K8S_NETMEASURE_ALLOW_CONTEXT_MISMATCH", value_delimiter = ',',
-          value_parser = ["nic_family", "cpu_model"])]
+          value_parser = ["nic_family", "cpu_model", "kernel_release"])]
     pub allow_context_mismatch: Vec<String>,
 
     #[command(flatten)]

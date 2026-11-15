@@ -48,7 +48,7 @@ fn report(args: &ReportArgs) -> Result<(), (u8, String)> {
 
     let overlap =
         checks::sequential(&before_refs, &after_refs).map_err(|e| (exit::COMPARISON_REFUSED, e))?;
-    let mismatches = checks::node_mismatches(&before_refs, &after_refs);
+    let mismatches = checks::node_mismatches(&before_refs, &after_refs, args.factor);
     let refused: Vec<_> = mismatches
         .iter()
         .filter(|m| !args.allow_context_mismatch.iter().any(|a| a == m.0))
@@ -61,9 +61,9 @@ fn report(args: &ReportArgs) -> Result<(), (u8, String)> {
         return Err((
             exit::COMPARISON_REFUSED,
             format!(
-                "context changed on a node, which measures the host, not the {:?}: {} \
+                "context changed on a node, which measures the host, not the {}: {} \
                  (accept with --allow-context-mismatch)",
-                args.factor,
+                args.factor.name(),
                 list.join("; ")
             ),
         ));
@@ -125,6 +125,9 @@ fn report(args: &ReportArgs) -> Result<(), (u8, String)> {
         }
         path::report(p, b, a, &plan);
     }
-    text::context(&checks::fields(&before_refs, &after_refs), &mismatches);
+    text::context(
+        &checks::fields(&before_refs, &after_refs, args.factor),
+        &mismatches,
+    );
     Ok(())
 }

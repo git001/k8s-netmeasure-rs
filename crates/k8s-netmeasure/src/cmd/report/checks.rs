@@ -4,6 +4,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use netmeasure_cli::report::Factor;
 use netmeasure_core::schema::control::NodeContext;
 
 use super::load::RunData;
@@ -45,16 +46,18 @@ impl Field {
     }
 }
 
-/// The fields every report lists, over the source contexts of all runs.
-pub fn fields(before: &[&RunData], after: &[&RunData]) -> Vec<Field> {
+/// The fields every report lists, over the source contexts of all runs; `factor`
+/// marks the fields the declared factor is about (§10.7 table).
+pub fn fields(before: &[&RunData], after: &[&RunData], declared: Factor) -> Vec<Field> {
     type Get = fn(&NodeContext) -> Option<String>;
+    let (kernel, nic) = (declared == Factor::Kernel, declared == Factor::NicSettings);
     let list: [(&str, bool, Get); 7] = [
-        ("kernel_release", true, |c| c.kernel_release.value.clone()),
-        ("kernel_version", true, |c| c.kernel_version.value.clone()),
+        ("kernel_release", kernel, |c| c.kernel_release.value.clone()),
+        ("kernel_version", kernel, |c| c.kernel_version.value.clone()),
         ("instance_type", false, |c| c.instance_type.value.clone()),
         ("cpu_model", false, |c| c.cpu_model.value.clone()),
         ("nic_family", false, |c| Some(family(c))),
-        ("nic_rings", false, |c| Some(rings(c))),
+        ("nic_rings", nic, |c| Some(rings(c))),
         ("mtu", false, |c| c.mtu.value.map(|m| m.to_string())),
     ];
     let set = |rs: &[&RunData], get: Get| -> BTreeSet<String> {
@@ -76,10 +79,12 @@ pub fn fields(before: &[&RunData], after: &[&RunData]) -> Vec<Field> {
 type NodeGet = fn(&NodeContext) -> String;
 
 /// Per node: the NIC family (drivers of the physical interfaces) or CPU model must
-/// not change between the sides (§10.6). Returns `(field, node, before, after)`.
+/// not change between the sides (§10.6), with `nic-settings` not the kernel either.
+/// Returns `(field, node, before, after)`.
 pub fn node_mismatches(
     before: &[&RunData],
     after: &[&RunData],
+    declared: Factor,
 ) -> Vec<(&'static str, String, String, String)> {
     let per_node = |rs: &[&RunData], get: NodeGet| {
         let mut m: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -91,7 +96,7 @@ pub fn node_mismatches(
         m
     };
     let mut out = Vec::new();
-    let checks: [(&'static str, NodeGet); 2] = [
+    let mut checks: Vec<(&'static str, NodeGet)> = vec![
         ("nic_family", family),
         ("cpu_model", |c| {
             c.cpu_model
@@ -100,6 +105,14 @@ pub fn node_mismatches(
                 .unwrap_or_else(|| "unknown".into())
         }),
     ];
+    if declared == Factor::NicSettings {
+        checks.push(("kernel_release", |c| {
+            c.kernel_release
+                .value
+                .clone()
+                .unwrap_or_else(|| "unknown".into())
+        }));
+    }
     for (name, get) in checks {
         let (b, a) = (per_node(before, get), per_node(after, get));
         for (node, vb) in &b {

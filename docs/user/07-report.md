@@ -6,16 +6,17 @@
 and gives one verdict on the declared primary quantile per path.
 
 ```sh
-k8s-netmeasure report --design sequential --factor kernel \
+k8s-netmeasure report --design sequential --factor kernel|nic-settings \
     --before mesh-results/before --after mesh-results/after \
     --equivalence-margin 10% --equivalence-rationale "p99 within ±10 % is no change for us" \
     [--primary p99] [--quantiles p50,p90,p99] [--replicates 10000] [--seed N] \
-    [--allow-context-mismatch nic_family,cpu_model]
+    [--allow-context-mismatch nic_family,cpu_model,kernel_release]
 ```
 
-**State:** this first version supports the sequential design (`before` on the same
-nodes, then `after`) with the factor `kernel`, and text output. The concurrent design
-with crossover, the other factors, NIC-family strata and JSON output *follow*. The
+**State:** this version supports the sequential design (`before` on the same nodes,
+then `after`) with the factors `kernel` and `nic-settings`, NIC-family strata and text
+output. The concurrent design with crossover, the factors `nic` and `load` and JSON
+output *follow*. The
 statistical method is covered by unit tests and by the smoke grid of the simulation
 suite (8 synthetic scenarios with a known effect, run on every push); the full grid
 *follows*. On your own data, `cargo xtask semisynthetic <dir>` (in a checkout of the
@@ -28,7 +29,7 @@ The report header names what has validated the method.
 | Flag | Meaning |
 |---|---|
 | `--design sequential` | required; the result files must not overlap in wall-clock time (≤ 1 s), else exit 5 |
-| `--factor kernel` | required; what changed between the sides. Kernel differences are expected, everything else is checked |
+| `--factor` | required; what changed between the sides. `kernel`: kernel differences are expected, everything else is checked. `nic-settings`: ring sizes are expected to differ on the same nodes; a changed kernel on a node is refused (exit 5) like a changed NIC family or CPU model |
 | `--primary` | default `p99`: the **only** latency quantile that gets a verdict; the others are descriptive |
 | `--equivalence-margin` | `10%` (on the ratio after/before) or `50us` (on the difference); needs `--equivalence-rationale`. Without a margin the verdict is never `equivalent` |
 | `--before`, `--after` | files or directories (searched recursively; other JSON files are skipped) |

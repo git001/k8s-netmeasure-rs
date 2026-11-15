@@ -19,7 +19,7 @@ pub fn header(args: &ReportArgs, plan: &Plan, overlap_ns: i128) {
         "design: {} (validated: the sides overlap by {:.1} s)   factor: {}",
         format!("{:?}", args.design).to_lowercase(),
         overlap_ns as f64 / 1e9,
-        format!("{:?}", args.factor).to_lowercase()
+        args.factor.name()
     );
     let margin = match plan.margin {
         Some(Margin::Relative(m)) => format!("±{:.1} % on the ratio after/before", m * 100.0),
@@ -86,8 +86,12 @@ pub fn context(fields: &[Field], mismatches: &[(&'static str, String, String, St
             println!("{mark}{:<15} both:   {}", f.name, join(&f.before));
         }
     }
+    let factor: Vec<&str> = fields.iter().filter(|f| f.factor).map(|f| f.name).collect();
     if fields.iter().filter(|f| f.factor).all(|f| !f.differs()) {
-        println!("! the declared factor did not change: before and after run the same kernel");
+        println!(
+            "! the declared factor did not change: {} the same on both sides",
+            factor.join(", ")
+        );
     }
     for (f, n, b, a) in mismatches {
         println!("! accepted mismatch on {n}: {f} {b} → {a}");

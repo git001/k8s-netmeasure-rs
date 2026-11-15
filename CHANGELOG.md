@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after `PENDING_S` is given up with the scheduler's reason; run pods request
   `RUN_CPU_REQUEST` (250m) with a limit of 1 CPU.
 - README: acknowledgement line.
+- `report --factor nic-settings`: the NIC ring sizes are the treatment, measured on the
+  same nodes before and after a settings change; a changed kernel on a node is
+  refused (exit 5) like a changed NIC family or CPU model,
+  `--allow-context-mismatch kernel_release` accepts it. The warning "declared factor
+  did not change" names the factor's fields.
 - `report` stratifies by NIC family (design §10.7): one block per path and stratum
   `source family → target family`, never pooled; k = paths × strata with the sample
   factor the same power needs in the header; a target without context takes its

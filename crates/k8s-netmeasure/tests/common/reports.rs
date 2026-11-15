@@ -43,3 +43,17 @@ pub fn dirs(name: &str) -> (PathBuf, PathBuf) {
     let base = std::env::temp_dir().join(format!("nm-report-{}-{name}", std::process::id()));
     (base.join("before"), base.join("after"))
 }
+
+/// Applies `f` to the only result file in `dir` (to give it another context).
+pub fn edit(dir: &Path, f: impl FnOnce(&mut serde_json::Value)) {
+    let file = std::fs::read_dir(dir)
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let mut v: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    f(&mut v);
+    std::fs::write(&file, serde_json::to_string(&v).unwrap()).unwrap();
+}
