@@ -86,12 +86,21 @@ or Ingress.
    The overlay pods restart until the underlay pod on their node is ready: they
    refuse to start without their node listener.
 3. Take the NIC inventory: `/v1/context` of every underlay `listen` lists its node's
-   NIC family, driver and rings. Choose source and target nodes from it.
+   NIC family, driver and rings. Choose source and target nodes from it. Query from
+   inside the pod, at the node IP (the control port is bound there, not on
+   `localhost`); the image has `curl`, `jq` runs locally:
    ```sh
-   for ip in $(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}'); do
-     curl -s "http://$ip:17701/v1/context" | jq -c '{node: .node_name.value, nic: .nic}'
+   for p in $(oc -n netmeasure get pods -l app.kubernetes.io/component=listen-underlay -o name); do
+     ip=$(oc -n netmeasure get "$p" -o jsonpath='{.status.hostIP}')
+     oc -n netmeasure exec "$p" -- curl -s "http://$ip:17701/v1/context" | jq -c '{node: .node_name.value, nic: .nic}'
    done
    ```
+   `curl` from a workstation or jump host to the node IPs often fails: an HTTP proxy
+   (`http_proxy`) or a firewall answers instead, and `jq` reports a parse error. If
+   you need it, use `curl --noproxy '*'`.
+   On OpenShift a project default node selector (`openshift.io/node-selector`) can
+   restrict the DaemonSets to fewer nodes than all workers; check
+   `oc get ds -n netmeasure`.
 4. In `run/run-overlay.yaml` (or `run-underlay.yaml`) set the source node
    (`SOURCE-NODE`), the targets (overlay: pod IPs of the overlay `listen` pods;
    underlay: node IPs) and `PHASE`, enable the Job in `run/kustomization.yaml` and
