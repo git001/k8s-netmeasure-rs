@@ -115,6 +115,12 @@ the treatment:
   measured traffic. Where a node has a synthetic NIC plus a VF (a common
   accelerated-networking setup), the VF's driver defines the family; both interfaces
   are recorded.
+  **Implemented differently (decided 2026-11-15):** the family is the sorted set of
+  the drivers of all physical interfaces (`synthetic+VF`). Telling the VF from the
+  synthetic NIC would need a list of vendor drivers in the code; the synthetic NIC is
+  the same on every host of a platform, so the set separates the families just as
+  well. A target without its own context takes the family its node reported as a
+  source.
 - A measured pair belongs to a **stratum** `(source family → target family)`.
 - Results are **never pooled across strata**, neither within a side nor between the
   sides. A kernel report therefore prints one verdict block per stratum, e.g. A→A,

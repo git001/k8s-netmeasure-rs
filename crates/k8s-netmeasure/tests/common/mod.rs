@@ -2,6 +2,7 @@
 #![allow(dead_code)] // each test crate uses a different subset
 
 pub mod listen;
+pub mod reports;
 pub mod result;
 
 use std::net::TcpListener;

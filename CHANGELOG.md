@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after `PENDING_S` is given up with the scheduler's reason; run pods request
   `RUN_CPU_REQUEST` (250m) with a limit of 1 CPU.
 - README: acknowledgement line.
+- `report` stratifies by NIC family (design §10.7): one block per path and stratum
+  `source family → target family`, never pooled; k = paths × strata with the sample
+  factor the same power needs in the header; a target without context takes its
+  node's family as a source, else stratum `unknown` with a warning; an instance type
+  seen with several NIC families is named. The loopback control is shown once per
+  path.
 - Mesh script: every run declares its node's zone and instance type from the node
   labels; `report` lists the instance type under "context, not verdict".
 - `report` refuses (exit 5) to pool runs of a path whose load parameters differ

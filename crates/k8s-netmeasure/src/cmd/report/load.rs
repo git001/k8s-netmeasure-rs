@@ -1,7 +1,8 @@
 //! Reading result files for `report` and grouping them (design §10.6): files or
 //! directories (searched recursively; other JSON files are skipped), one side per
 //! declared set, grouped by path; within a path the source nodes form the top
-//! resampling level and every run pools its real targets.
+//! resampling level and every run pools its real targets per NIC-family stratum
+//! (`strata.rs`).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -11,12 +12,17 @@ use netmeasure_core::stats::blocklen;
 use netmeasure_core::stats::series::{Series, series};
 use netmeasure_util::time::parse_rfc3339_ns;
 
+/// One real target of a run with the NIC family its own context reports.
+pub struct TargetSeries {
+    pub name: String,
+    pub family: Option<String>,
+    pub series: Series,
+}
+
 /// One run, prepared for the statistics.
 pub struct RunData {
     pub file: ResultFile,
-    /// All real targets of the run as segments of one series (blocks never cross
-    /// targets, because every target's stretches are separate segments).
-    pub targets: Series,
+    pub targets: Vec<TargetSeries>,
     pub loopback: Series,
     /// Floor of the block length in samples of one target series (§10.2).
     pub floor: f64,
@@ -84,16 +90,25 @@ fn prepare(path: PathBuf, file: ResultFile) -> Result<RunData, String> {
         .next()
         .ok_or_else(|| format!("{}: no targets", path.display()))?;
     let real: Vec<Series> = iter.collect();
-    let first = real
-        .first()
-        .ok_or_else(|| format!("{}: no real target", path.display()))?;
-    let targets = Series {
-        run_id: first.run_id.clone(),
-        target: 1,
-        name: "all targets".into(),
-        timeout_ns: first.timeout_ns,
-        segments: real.iter().flat_map(|s| s.segments.clone()).collect(),
+    if real.is_empty() {
+        return Err(format!("{}: no real target", path.display()));
+    }
+    let family_of = |index: u16| {
+        file.targets
+            .iter()
+            .find(|t| t.index == index)
+            .and_then(|t| t.context_before.as_ref())
+            .map(super::checks::family)
+            .filter(|f| f != "unknown")
     };
+    let targets: Vec<TargetSeries> = real
+        .iter()
+        .map(|s| TargetSeries {
+            name: s.name.clone(),
+            family: family_of(s.target),
+            series: s.clone(),
+        })
+        .collect();
     let c = &file.run.config;
     let every = u64::from(c.loopback_every);
     let spacing = |lo| blocklen::spacing_ns(c.interval_ns, real.len() as u64, every, lo);

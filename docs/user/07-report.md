@@ -43,9 +43,14 @@ rationale down: chosen afterwards, they can be fitted to the result.
 
 ## Reading the output
 
-- One section per path (overlay, underlay). Each side pools all real targets of its
-  runs; the **source nodes** are the top level of the bootstrap, then the runs, then
-  blocks of 5 s within each run.
+- One section per path (overlay, underlay) with the local control, then one block per
+  **NIC stratum** `source family → target family`, e.g. `A → A`, `A → B`. Strata are
+  never pooled: a mixed cluster gets one verdict per stratum. The NIC family of a
+  node is the set of drivers of its physical interfaces; a target without its own
+  context takes the family its node reported as a source, else it is `unknown` (a
+  warning in that block). Within a stratum each side pools the matching targets of
+  its runs; the **source nodes** are the top level of the bootstrap, then the runs,
+  then blocks of 5 s within each run.
 - `verdict` on the primary quantile:
   - `WORSE` / `BETTER`: the interval excludes "no change";
   - `EQUIVALENT`: the TOST interval lies inside the margin ("statistically
@@ -53,7 +58,13 @@ rationale down: chosen afterwards, they can be fitted to the result.
   - `INCONCLUSIVE`: neither; usually too few runs for the margin. More runs per side
     narrow the interval.
 - Intervals of a relative margin are ratios (`1.000` = no change); the level is
-  Bonferroni-adjusted over the paths compared (two paths: 97.5 %, TOST 95 %).
+  Bonferroni-adjusted over k = paths × strata (two paths, one stratum: 97.5 %, TOST
+  95 %). The header prints k and how many times the samples the same power needs
+  compared with k = 1 (four strata: ≈ 1.86 ×), so do not expect `equivalent` in many
+  strata from a default run.
+- An instance type that occurs with several NIC families is named in the header:
+  the same machine type can sit on different NIC hardware, which is why results
+  follow the observed family, never the instance type.
 - `evidence`: `exploratory` with one run per node and side, `preliminary` with more,
   `strong` only with ≥ 5 runs per side **interleaved** in time (≥ 3 side switches),
   which a before/after kernel change cannot have.
@@ -64,10 +75,9 @@ rationale down: chosen afterwards, they can be fitted to the result.
 - `between-run spread`: the primary quantile of every run; if it is wide, more runs
   help more than more samples per run.
 - `context, not verdict`: kernel, instance type (declared), CPU model, NIC family,
-  ring sizes and MTU of both
-  sides, one `both:` line when they agree, `before:`/`after:` when they differ. `!`
-  marks a difference outside the declared factor. A changed NIC family or
-  CPU model **on the same node** refuses the comparison (exit 5), because the node
+  ring sizes and MTU of both sides, one `both:` line when they agree,
+  `before:`/`after:` when they differ. `!` marks a difference outside the declared
+  factor. A changed NIC family or CPU model **on the same node** refuses the comparison (exit 5), because the node
   then measures another host; `--allow-context-mismatch` accepts it, printed.
 
 ## Exit codes

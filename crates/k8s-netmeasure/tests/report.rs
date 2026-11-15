@@ -3,49 +3,9 @@
 
 mod common;
 
-use std::path::{Path, PathBuf};
-
-use common::listen::{Running, start};
+use common::listen::start;
+use common::reports::{dirs, run, run_at};
 use common::{bin, stdout};
-
-/// A short real run against the listener, written into `dir`.
-fn run(l: &Running, dir: &Path, samples: &str) {
-    run_at(l, dir, samples, "1ms");
-}
-
-fn run_at(l: &Running, dir: &Path, samples: &str, interval: &str) {
-    std::fs::create_dir_all(dir).unwrap();
-    let control_port = l.control.rsplit(':').next().unwrap();
-    bin()
-        .args([
-            "run",
-            "--target",
-            &l.addr,
-            "--target-control-port",
-            control_port,
-        ])
-        .args(["--samples", samples, "--warmup", "0"])
-        .args([
-            "--interval",
-            interval,
-            "--path",
-            "underlay",
-            "--node-name",
-            "node-a",
-        ])
-        .args([
-            "--no-cgroup-check",
-            "--output",
-            &format!("{}/", dir.display()),
-        ])
-        .assert()
-        .code(0);
-}
-
-fn dirs(name: &str) -> (PathBuf, PathBuf) {
-    let base = std::env::temp_dir().join(format!("nm-report-{}-{name}", std::process::id()));
-    (base.join("before"), base.join("after"))
-}
 
 #[test]
 fn sequential_kernel_report_on_real_runs() {

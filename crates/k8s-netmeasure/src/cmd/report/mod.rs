@@ -1,22 +1,24 @@
-//! `report` (design §10.4–§10.6), first step: the sequential design with the factor
-//! `kernel`. Per path one comparison of all real targets, the source nodes as the
-//! top resampling level, the loopback control on its median; the context of both
-//! sides is listed and a changed NIC family or CPU model per node refuses (exit 5).
-//! The verdict never sets the exit code.
+//! `report` (design §10.4–§10.7), first step: the sequential design with the factor
+//! `kernel`. Per path and NIC stratum (source family → target family) one comparison,
+//! never pooled across strata, the source nodes as the top resampling level; the
+//! loopback control on its median per path; the context of both sides is listed and
+//! a changed NIC family or CPU model per node refuses (exit 5). The verdict never
+//! sets the exit code.
 
+mod block;
 mod checks;
 mod fmt;
 mod load;
 mod params;
+mod path;
+mod strata;
 mod text;
 
-use std::collections::BTreeMap;
 use std::process::ExitCode;
 
 use netmeasure_cli::ReportArgs;
 use netmeasure_cli::report::MarginArg;
-use netmeasure_core::stats::compare::{Comparison, Plan, compare};
-use netmeasure_core::stats::side::{RunInput, Side};
+use netmeasure_core::stats::compare::Plan;
 use netmeasure_core::stats::verdict::Margin;
 
 use self::load::RunData;
@@ -32,14 +34,6 @@ pub fn run(args: &ReportArgs) -> ExitCode {
             exit::code(code)
         }
     }
-}
-
-/// Everything the text output needs for one path.
-pub struct PathResult<'a> {
-    pub path: &'a str,
-    pub targets: Comparison,
-    pub loopback: Comparison,
-    pub evidence: (&'static str, String),
 }
 
 fn report(args: &ReportArgs) -> Result<(), (u8, String)> {
@@ -80,10 +74,25 @@ fn report(args: &ReportArgs) -> Result<(), (u8, String)> {
         let a: Vec<&RunData> = ai.iter().map(|&i| &after[i]).collect();
         params::check(path, &b, &a).map_err(|e| (exit::COMPARISON_REFUSED, e))?;
     }
-    let k = groups
-        .values()
-        .filter(|(b, a)| !b.is_empty() && !a.is_empty())
-        .count() as u32;
+    let (fam_b, fam_a) = (
+        strata::node_families(&before_refs),
+        strata::node_families(&after_refs),
+    );
+    let paths: Vec<(&String, path::Prepared, path::Prepared)> = groups
+        .iter()
+        .map(|(p, (bi, ai))| {
+            (
+                p,
+                path::Prepared::new(&before, bi, &fam_b),
+                path::Prepared::new(&after, ai, &fam_a),
+            )
+        })
+        .collect();
+    // Every stratum verdict can stand alone as a finding: k = paths × strata (§10.7).
+    let k: usize = paths
+        .iter()
+        .map(|(_, b, a)| path::strata(b, a).0.len())
+        .sum();
     let mut quantiles = args.quantiles.clone();
     quantiles.push(args.primary);
     quantiles.sort_by(f64::total_cmp);
@@ -95,57 +104,27 @@ fn report(args: &ReportArgs) -> Result<(), (u8, String)> {
             MarginArg::Relative(r) => Margin::Relative(r),
             MarginArg::AbsoluteNs(n) => Margin::AbsoluteNs(n),
         }),
-        k: k.max(1),
+        k: (k as u32).max(1),
         replicates: args.replicates as usize,
         seed: args.seed.unwrap_or(time::realtime_ns() as u64),
         block_override: None,
     };
     text::header(args, &plan, overlap);
-    for (path, (bi, ai)) in &groups {
-        if bi.is_empty() || ai.is_empty() {
-            println!("\n== path {path} ==  only on one side: not compared");
+    let all: Vec<&RunData> = before_refs.iter().chain(&after_refs).copied().collect();
+    for (t, families) in strata::mixed_instance_types(&all) {
+        println!(
+            "! instance type {t} occurs with several NIC families ({}): results are \
+             stratified by observed family, never by instance type",
+            families.join(", ")
+        );
+    }
+    for (p, b, a) in &paths {
+        if b.runs.is_empty() || a.runs.is_empty() {
+            println!("\n== path {p} ==  only on one side: not compared");
             continue;
         }
-        let b: Vec<&RunData> = bi.iter().map(|&i| &before[i]).collect();
-        let a: Vec<&RunData> = ai.iter().map(|&i| &after[i]).collect();
-        let loop_plan = Plan {
-            quantiles: vec![0.5],
-            primary: 0.5,
-            margin: None,
-            k: 1,
-            replicates: plan.replicates.min(2000),
-            ..plan.clone()
-        };
-        let result = PathResult {
-            path,
-            targets: compare(&side(&b, false), &side(&a, false), &plan),
-            loopback: compare(&side(&b, true), &side(&a, true), &loop_plan),
-            evidence: checks::evidence(&b, &a),
-        };
-        text::path(&result, &plan);
+        path::report(p, b, a, &plan);
     }
     text::context(&checks::fields(&before_refs, &after_refs), &mismatches);
     Ok(())
-}
-
-/// One side: source nodes as the top level, their runs below.
-fn side<'a>(runs: &[&'a RunData], loopback: bool) -> Side<'a> {
-    let mut nodes: BTreeMap<&str, Vec<RunInput<'a>>> = BTreeMap::new();
-    for r in runs {
-        let input = if loopback {
-            RunInput {
-                series: &r.loopback,
-                floor_samples: r.loopback_floor,
-            }
-        } else {
-            RunInput {
-                series: &r.targets,
-                floor_samples: r.floor,
-            }
-        };
-        nodes.entry(r.node.as_str()).or_default().push(input);
-    }
-    Side {
-        nodes: nodes.into_values().collect(),
-    }
 }
