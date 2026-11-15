@@ -97,9 +97,9 @@
 <!-- report -->
 <g id="node8" class="node">
 <title>report</title>
-<path fill="#f4f4f4" stroke="#4a6fa5" stroke-dasharray="5,2" d="M463.2,-36C463.2,-36 242.4,-36 242.4,-36 236.4,-36 230.4,-30 230.4,-24 230.4,-24 230.4,-12 230.4,-12 230.4,-6 236.4,0 242.4,0 242.4,0 463.2,0 463.2,0 469.2,0 475.2,-6 475.2,-12 475.2,-12 475.2,-24 475.2,-24 475.2,-30 469.2,-36 463.2,-36"/>
-<text xml:space="preserve" text-anchor="middle" x="352.8" y="-21.25" font-family="Helvetica,sans-Serif" font-size="10.00">7. report: compare the result files</text>
-<text xml:space="preserve" text-anchor="middle" x="352.8" y="-8.5" font-family="Helvetica,sans-Serif" font-size="10.00">(milestone 5, follows)</text>
+<path fill="#eef3fb" stroke="#4a6fa5" d="M463.2,-36C463.2,-36 242.4,-36 242.4,-36 236.4,-36 230.4,-30 230.4,-24 230.4,-24 230.4,-12 230.4,-12 230.4,-6 236.4,0 242.4,0 242.4,0 463.2,0 463.2,0 469.2,0 475.2,-6 475.2,-12 475.2,-12 475.2,-24 475.2,-24 475.2,-30 469.2,-36 463.2,-36"/>
+<text xml:space="preserve" text-anchor="middle" x="352.8" y="-21.25" font-family="Helvetica,sans-Serif" font-size="10.00">7. report: compare before and after</text>
+<text xml:space="preserve" text-anchor="middle" x="352.8" y="-8.5" font-family="Helvetica,sans-Serif" font-size="10.00">(verdict on the primary quantile)</text>
 </g>
 <!-- run2&#45;&gt;report -->
 <g id="edge7" class="edge">

@@ -39,6 +39,13 @@ pub fn rfc3339_ns(unix_ns: i128) -> String {
     }
 }
 
+/// Nanoseconds since the Unix epoch of an RFC 3339 timestamp; `None` if invalid.
+pub fn parse_rfc3339_ns(text: &str) -> Option<i128> {
+    text.parse::<jiff::Timestamp>()
+        .ok()
+        .map(|t| t.as_nanosecond())
+}
+
 /// UTC timestamp to the second for file names, e.g. `20261115T024255Z`.
 pub fn compact_utc(unix_ns: i128) -> String {
     match jiff::Timestamp::from_nanosecond(unix_ns) {
@@ -65,6 +72,9 @@ mod tests {
         assert_eq!(rfc3339_ns(i128::MAX), "invalid-time");
         assert_eq!(compact_utc(1_000_000_000_123), "19700101T001640Z");
         assert_eq!(compact_utc(i128::MAX), "invalid-time");
+        let ts = rfc3339_ns(1_000_000_000_123);
+        assert_eq!(parse_rfc3339_ns(&ts), Some(1_000_000_000_123));
+        assert_eq!(parse_rfc3339_ns("nope"), None);
     }
 
     #[test]

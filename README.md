@@ -4,7 +4,8 @@ Reproducible TCP connect-latency measurement in Kubernetes and OpenShift.
 
 **Status: milestone 3 of the [Phase 1 implementation plan](docs/design/2026-11-13_phase1-design/11-implementation-plan.md)
 complete:** `probe`, `selftest`, `listen` and `run`, with example manifests in
-[deploy/examples/](deploy/examples/README.md). `report` follows. The [user guide](docs/user/README.md) explains how to use the tool, with diagrams of
+[deploy/examples/](deploy/examples/README.md), and a first `report` (sequential design,
+factor `kernel`). The [user guide](docs/user/README.md) explains how to use the tool, with diagrams of
 the flows. The design is in
 [docs/design/2026-11-13_phase1-design/](docs/design/2026-11-13_phase1-design/README.md).
 
@@ -27,7 +28,7 @@ in a support case:
    on every node and around every measurement cycle instead of assuming it.
 2. **Does a change make it better, worse or equivalent?** For example a test
    kernel, a driver update or a new node image, measured before and after with the
-   same parameters and compared with confidence intervals (`report`, follows).
+   same parameters and compared with confidence intervals (`report`).
 
 Existing tools answer different questions. k8s-netperf runs throughput and
 request/response benchmarks and averages percentiles; goldpinger times HTTP round

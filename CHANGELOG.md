@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `report` (first step of milestone 5): compares `--before` and `--after` result
+  files in the sequential design with the factor `kernel`. Per path one verdict on
+  the declared primary quantile (default p99) with an equivalence margin and its
+  rationale, Bonferroni over the paths, source nodes as the top bootstrap level;
+  descriptive quantiles, failure and SYN-retransmission rates, the loopback median,
+  the between-run spread, the evidence label and the context of both sides. Refuses
+  (exit 5) overlapping sides and a changed NIC family or CPU model on a node unless
+  `--allow-context-mismatch`. User guide page `07-report.md`.
+
 - `deploy/examples/mesh/mesh.sh`: every node measures every other node without
   hand-edited manifests. It deploys the listeners (with optional node labels and
   tolerations from the environment), finds the listener addresses, runs one Job per

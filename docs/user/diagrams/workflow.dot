@@ -12,7 +12,7 @@ digraph workflow {
   run      [label="4. run: baseline (e.g. --label phase=baseline)"];
   change   [label="5. apply the change under test\n(kernel, driver, node pool, …)", fillcolor="#fdecea", color="#b23b3b"];
   run2     [label="6. run again with the same parameters\n(--label phase=after)"];
-  report   [label="7. report: compare the result files\n(milestone 5, follows)", style="rounded,dashed,filled", fillcolor="#f4f4f4"];
+  report   [label="7. report: compare before and after\n(verdict on the primary quantile)"];
 
   selftest -> findings [style=dashed, arrowhead=none];
   selftest -> listen -> probe -> run -> change -> run2 -> report;

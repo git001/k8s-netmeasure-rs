@@ -51,6 +51,7 @@ fn main() -> ExitCode {
     match &cli.command {
         Subcommands::Listen(args) => cmd::listen::run(args),
         Subcommands::Probe(args) => cmd::probe::run(args),
+        Subcommands::Report(args) => cmd::report::run(args),
         Subcommands::Run(args) => cmd::run::run(args, &env.sources),
         Subcommands::Selftest(args) => cmd::selftest::run(args, &env.sources),
     }

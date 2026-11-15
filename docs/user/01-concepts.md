@@ -76,7 +76,7 @@ A normal pod cannot see the node's NIC. For overlay measurements a **node listen
 The run is cut into **cycles** (default 10, each between 2 s and 60 s). Before and
 after each cycle `run` reads counters on both sides. A cycle in which something
 disturbed the measurement is marked **invalid**; its samples stay in the file, and
-`report` (follows) leaves invalid cycles out.
+[`report`](07-report.md) leaves invalid cycles out.
 
 ![Cycle validity](diagrams/cycle-validity.svg)
 

@@ -9,6 +9,8 @@ pub const USAGE: u8 = 2;
 pub const REFUSED: u8 = 3;
 /// `run` completed, at least one cycle invalid.
 pub const INVALID_CYCLES: u8 = 4;
+/// `report`: the comparison was refused (context mismatch, design contradicted).
+pub const COMPARISON_REFUSED: u8 = 5;
 pub const SELFTEST_INCOMPLETE: u8 = 6;
 pub const PROBE_NOT_OK: u8 = 7;
 

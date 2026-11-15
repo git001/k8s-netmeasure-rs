@@ -7,9 +7,9 @@ families, kernels or drivers. The design and its reasoning are in
 
 **State:** this guide describes what is built today. `selftest`, `probe`, `listen` and
 `run` are usable, including `--node-context-from` (NIC context for overlay pods), and
-example manifests are in [deploy/examples/](../../deploy/examples/README.md). Still
-missing: `report` (comparison of result files).
-Those parts are marked *follows*.
+example manifests and the mesh script are in
+[deploy/examples/](../../deploy/examples/README.md). `report` compares before and after
+in the sequential design; the concurrent design and JSON output are marked *follows*.
 
 > [!WARNING]
 > **`listen` has only minimal protection. Never expose it to the internet.** See
@@ -25,7 +25,8 @@ Those parts are marked *follows*.
 5. [Running in Kubernetes and OpenShift](05-kubernetes-openshift.md): pods,
    `hostNetwork`, permissions, security
 6. [Troubleshooting](06-troubleshooting.md): exit codes, invalid cycles, common errors
-7. [Diagrams](diagrams/README.md): sources and how to render them
+7. [`report`](07-report.md): before and after, verdict on the primary quantile
+8. [Diagrams](diagrams/README.md): sources and how to render them
 
 ## Five-minute start
 

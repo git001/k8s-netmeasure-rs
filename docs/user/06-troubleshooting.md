@@ -1,19 +1,20 @@
 # Troubleshooting
 
-[User guide](README.md) · previous: [Running in Kubernetes and OpenShift](05-kubernetes-openshift.md)
+[User guide](README.md) · previous: [Running in Kubernetes and OpenShift](05-kubernetes-openshift.md) · next: [`report`](07-report.md)
 
 ## Exit codes of all subcommands
 
-| Code | `run` | `listen` | `selftest` | `probe` |
-|---|---|---|---|---|
-| 0 | every cycle valid | — | every check established its result | every connect `ok` |
-| 1 | internal error | internal error | internal error / report not writable | internal error |
-| 2 | usage error | usage error | usage error | usage error |
-| 3 | refused to start | port cannot be bound | — | — |
-| 4 | at least one cycle invalid | — | — | — |
-| 6 | — | — | a check was inconclusive | — |
-| 7 | — | — | — | a connect was not `ok` |
-| 130 / 143 | SIGINT / SIGTERM | SIGINT / SIGTERM | — | — |
+| Code | `run` | `listen` | `selftest` | `probe` | `report` |
+|---|---|---|---|---|---|
+| 0 | every cycle valid | — | every check established its result | every connect `ok` | report produced |
+| 1 | internal error | internal error | internal error / report not writable | internal error | internal error |
+| 2 | usage error | usage error | usage error | usage error | usage error |
+| 3 | refused to start | port cannot be bound | — | — | — |
+| 4 | at least one cycle invalid | — | — | — | — |
+| 5 | — | — | — | — | comparison refused (overlap in time, NIC family or CPU model changed on a node) |
+| 6 | — | — | a check was inconclusive | — | — |
+| 7 | — | — | — | a connect was not `ok` | — |
+| 130 / 143 | SIGINT / SIGTERM | SIGINT / SIGTERM | — | — | — |
 
 ## Why is a cycle invalid?
 

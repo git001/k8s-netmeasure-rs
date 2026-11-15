@@ -76,8 +76,8 @@ jq '.measurement.cycles[] | {index, valid: .validity.valid, reasons: .validity.r
 jq '.run.config' result.json
 ```
 
-`report`, which compares result files with confidence intervals and verdicts,
-*follows*.
+[`report`](07-report.md) compares result files with confidence intervals and
+verdicts.
 
 ## Log lines
 

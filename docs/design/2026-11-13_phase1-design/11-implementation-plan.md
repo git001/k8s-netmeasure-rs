@@ -43,6 +43,11 @@ milestone ends with something that runs and is reviewed before the next one star
    full grid weekly); 4e semi-synthetic check against real runs (harness committed,
    data local only). The evidence label (§10.5) and the NIC-family analysis (§10.7)
    belong to step 5.
+   **Brought forward on 2026-11-16** for a kernel change on 2026-11-17: a first
+   `report` (sequential design, factor `kernel`, text output, sides pooled per path
+   with the source nodes as the top resampling level) and the mesh script
+   (`deploy/examples/mesh/`). The simulation suite (4d) follows right after; until
+   then every report header says the method is covered by unit tests only.
 5. **`report`.** Declared designs and factors, crossover, comparability, NIC-family
    stratification and the kernel × NIC interaction (§10.7), text and JSON output.
 6. **Background load, underlay diagnostics (ethtool, netstat), README.** The ethtool

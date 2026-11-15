@@ -16,6 +16,7 @@ pub mod listen;
 pub mod log;
 pub mod parse;
 pub mod probe;
+pub mod report;
 pub mod run;
 pub mod selftest;
 pub mod surface;
@@ -26,6 +27,7 @@ pub use crate::context::ContextArgs;
 pub use crate::listen::{ControlBind, ListenArgs};
 pub use crate::log::{LogArgs, LogLevel};
 pub use crate::probe::ProbeArgs;
+pub use crate::report::ReportArgs;
 pub use crate::run::{PathKind, RunArgs};
 pub use crate::selftest::SelftestArgs;
 
@@ -60,6 +62,9 @@ pub enum Subcommands {
     /// Manual cross-check: a few connects with the measurement code path, one JSON
     /// line each. Not a measurement: no pacing, cycles or self-validation.
     Probe(ProbeArgs),
+    /// Compares two sets of result files (before / after) with block-bootstrap
+    /// intervals and a verdict on the declared primary quantile.
+    Report(ReportArgs),
     /// The measurement: paced connects to the targets and the own loopback control in
     /// cycles, each validated, written to one result file.
     Run(RunArgs),
@@ -75,6 +80,7 @@ impl Subcommands {
         match self {
             Subcommands::Listen(a) => &a.log,
             Subcommands::Probe(a) => &a.log,
+            Subcommands::Report(a) => &a.log,
             Subcommands::Run(a) => &a.log,
             Subcommands::Selftest(a) => &a.log,
         }
