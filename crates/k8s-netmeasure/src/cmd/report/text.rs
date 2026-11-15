@@ -178,9 +178,11 @@ pub fn context(fields: &[Field], mismatches: &[(&'static str, String, String, St
         let join = |s: &std::collections::BTreeSet<String>| {
             s.iter().cloned().collect::<Vec<_>>().join(" | ")
         };
-        println!("{mark}{:<15} before: {}", f.name, join(&f.before));
         if f.differs() {
+            println!("{mark}{:<15} before: {}", f.name, join(&f.before));
             println!("{mark}{:<15} after:  {}", "", join(&f.after));
+        } else {
+            println!("{mark}{:<15} both:   {}", f.name, join(&f.before));
         }
     }
     if fields.iter().filter(|f| f.factor).all(|f| !f.differs()) {

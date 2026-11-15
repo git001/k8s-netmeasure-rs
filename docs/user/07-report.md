@@ -57,7 +57,8 @@ rationale down: chosen afterwards, they can be fitted to the result.
 - `between-run spread`: the primary quantile of every run; if it is wide, more runs
   help more than more samples per run.
 - `context, not verdict`: kernel, CPU model, NIC family, ring sizes and MTU of both
-  sides. `!` marks a difference outside the declared factor. A changed NIC family or
+  sides, one `both:` line when they agree, `before:`/`after:` when they differ. `!`
+  marks a difference outside the declared factor. A changed NIC family or
   CPU model **on the same node** refuses the comparison (exit 5), because the node
   then measures another host; `--allow-context-mismatch` accepts it, printed.
 
