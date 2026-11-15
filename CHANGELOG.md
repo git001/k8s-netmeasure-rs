@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after `PENDING_S` is given up with the scheduler's reason; run pods request
   `RUN_CPU_REQUEST` (250m) with a limit of 1 CPU.
 - README: acknowledgement line.
+- Simulation smoke grid (design §11): 8 synthetic scenarios with a known effect,
+  R = 200, checked against the smoke-band criteria, including a negative control
+  that proves the naive bootstrap under-covers. New gate `cargo xtask sim`, part of
+  `ci`. The `report` header now names it under "method validation".
 
 - Statistics, milestone 4a (`netmeasure-core::stats`): per-target sample series from
   result files (valid cycles only, without warm-up, consecutive valid cycles as one

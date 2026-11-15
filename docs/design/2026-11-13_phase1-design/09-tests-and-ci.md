@@ -106,6 +106,13 @@ the test code.
 - Per push: a smoke grid of 8 scenarios with R = 200. With SE ≈ 1.5 pp, the band
   there is [89 %, 100 %]. It only catches gross breakage; the weekly grid is the real
   gate.
+  Implemented in `netmeasure-core/tests/sim.rs` (`cargo xtask sim`, part of `ci`):
+  i.i.d., AR(1) 0.9, run effects, bursts (all without effect), a clear regression
+  × 1.3, × 1.15 just outside a 10 % margin, 2 % timeouts, and the naive-bootstrap
+  negative control. The negative control uses **one run per side**: with several
+  runs the run level of the bootstrap already carries most of the variance, so a
+  naive block inside a run still covers (≈ 92 % at five runs) and would not prove
+  anything. With 2 % timeouts p99 is censored; only the verdict rules are checked.
 
 Acceptance criteria (weekly grid):
 - empirical coverage of the nominal 95 % intervals within **[93 %, 97 %]**; of the
@@ -154,7 +161,8 @@ Actions, since the repository is on GitHub). The workflow logic lives in Rust in
 | File size | `cargo xtask line-limit` | any `.rs` file > 400 lines, or > 200 lines without a `//! line-limit: <reason>` line, counted outside `#[cfg(test)]` items (§2). Parsed with `syn`, so test modules are recognised exactly rather than by a line pattern |
 | Argument count | `#![forbid(clippy::too_many_arguments)]` in every crate root (`deny` in `netmeasure-cli`, §2); `cargo xtask line-limit` checks the crate roots, rejects any `allow`/`expect`/`warn` of the lint or of `clippy::complexity` / `clippy::all`, and checks that no `clippy.toml` / `.clippy.toml` raises `too-many-arguments-threshold` | any function over the limit (7); any attempt to `allow` it or to raise the threshold |
 | Config surface | unit test over the clap command tree (§9.1) | a parameter without env var, a misnamed env var, a missing unknown-env check, or a parameter set via CLI and env that is not rejected |
-| Tests | `cargo test --locked` (unit + integration, loopback only, reduced simulation grid) | any failure |
+| Tests | `cargo test --locked` (unit + integration, loopback only) | any failure |
+| Simulation smoke | `cargo xtask sim`: smoke grid (§11), release build, every push | any smoke-band criterion missed |
 | Simulation | full statistics simulation grid (§11), weekly | any acceptance criterion missed |
 | musl artifact | `cargo xtask musl`: `cargo build --release --target x86_64-unknown-linux-musl` on the runner (Rust musl target only, no `musl-gcc`), then the test suite against it (§1); not part of `cargo xtask ci`, because it adds the musl target and needs `cargo-auditable` | build or test failure |
 | Coverage | `cargo llvm-cov` (lcov + HTML report as CI artifact) | line coverage below **90 %** in `netmeasure-core`, `netmeasure-util` and `netmeasure-cli`, or below **70 %** in `k8s-netmeasure` |

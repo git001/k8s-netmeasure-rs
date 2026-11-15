@@ -12,7 +12,8 @@ use super::checks::Field;
 use super::fmt::{est, iv, ns, pname};
 
 /// What has validated the statistical method so far (design §11).
-const VALIDATION: &str = "unit tests only; the simulation suite (§11) is not run yet";
+const VALIDATION: &str =
+    "unit tests and the simulation smoke grid (§11, 8 scenarios); the full grid follows";
 
 pub fn header(args: &ReportArgs, plan: &Plan, overlap_ns: i128) {
     println!("k8s-netmeasure report");

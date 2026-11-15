@@ -16,8 +16,10 @@ k8s-netmeasure report --design sequential --factor kernel \
 **State:** this first version supports the sequential design (`before` on the same
 nodes, then `after`) with the factor `kernel`, and text output. The concurrent design
 with crossover, the other factors, NIC-family strata and JSON output *follow*. The
-statistical method is covered by unit tests; the simulation suite that validates
-its coverage *follows* and is named in every report header.
+statistical method is covered by unit tests and by the smoke grid of the simulation
+suite (8 synthetic scenarios with a known effect, run on every push); the full grid
+and the semi-synthetic check on real runs *follow*. The report header names what has
+validated the method.
 
 ## Declare before you measure
 

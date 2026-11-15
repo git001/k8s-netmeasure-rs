@@ -20,6 +20,7 @@ gates:
   clippy       cargo clippy --all-targets -D warnings
   line-limit   .rs file size rule, argument-count rule (design §2, §12)
   test         cargo test --locked
+  sim          statistics simulation, smoke grid (design §11), release build
   deny         cargo deny check, plus duplicate-exception review dates
   audit        cargo audit (RustSec)
   coverage     cargo llvm-cov with per-crate line thresholds
@@ -54,6 +55,22 @@ const GATES: &[(&str, Gate)] = &[
     ("line-limit", line_limit::run),
     ("test", |root| {
         proc::cargo(root, &["test", "--workspace", "--locked"])
+    }),
+    ("sim", |root| {
+        proc::cargo(
+            root,
+            &[
+                "test",
+                "--release",
+                "--locked",
+                "--package",
+                "netmeasure-core",
+                "--test",
+                "sim",
+                "--",
+                "--ignored",
+            ],
+        )
     }),
     ("deny", deny::run),
     ("audit", |root| {
