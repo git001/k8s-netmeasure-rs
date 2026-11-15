@@ -48,9 +48,10 @@ impl Field {
 /// The fields every report lists, over the source contexts of all runs.
 pub fn fields(before: &[&RunData], after: &[&RunData]) -> Vec<Field> {
     type Get = fn(&NodeContext) -> Option<String>;
-    let list: [(&str, bool, Get); 6] = [
+    let list: [(&str, bool, Get); 7] = [
         ("kernel_release", true, |c| c.kernel_release.value.clone()),
         ("kernel_version", true, |c| c.kernel_version.value.clone()),
+        ("instance_type", false, |c| c.instance_type.value.clone()),
         ("cpu_model", false, |c| c.cpu_model.value.clone()),
         ("nic_family", false, |c| Some(family(c))),
         ("nic_rings", false, |c| Some(rings(c))),

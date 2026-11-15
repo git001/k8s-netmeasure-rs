@@ -141,6 +141,17 @@ cmd_inventory() {
   done < <(listeners underlay)
 }
 
+# Zone and instance type per node from the node labels (NODE_ZONE, NODE_TYPE), passed
+# to every run as its declared context; a DaemonSet template cannot carry per-node
+# values and the Downward API cannot read node labels.
+declare -A NODE_ZONE=() NODE_TYPE=()
+node_labels() {
+  local node zone type
+  while IFS=$'\t' read -r node zone type; do
+    NODE_ZONE[$node]=$zone NODE_TYPE[$node]=$type
+  done < <($OC get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels.topology\.kubernetes\.io/zone}{"\t"}{.metadata.labels.node\.kubernetes\.io/instance-type}{"\n"}{end}')
+}
+
 job_manifest() { # name path phase round node targets…
   local name=$1 path=$2 phase=$3 round=$4 node=$5
   shift 5
@@ -205,6 +216,14 @@ EOF
               valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
             - name: HOST_IP
               valueFrom: {fieldRef: {fieldPath: status.hostIP}}
+EOF
+  if [[ -n ${NODE_ZONE[$node]:-} ]]; then
+    printf '            - {name: K8S_NETMEASURE_ZONE, value: "%s"}\n' "${NODE_ZONE[$node]}"
+  fi
+  if [[ -n ${NODE_TYPE[$node]:-} ]]; then
+    printf '            - {name: K8S_NETMEASURE_INSTANCE_TYPE, value: "%s"}\n' "${NODE_TYPE[$node]}"
+  fi
+  cat <<EOF
           resources:
             requests: {cpu: $RUN_CPU_REQUEST, memory: 256Mi}
             limits: {cpu: "1", memory: 256Mi}
@@ -239,6 +258,7 @@ cmd_round() { # path phase round
   fi
   ((${#nodes[@]} >= 2)) || die "$path: fewer than two ready listeners"
   log "$path round $round ($phase): ${#nodes[@]} nodes, $((${#nodes[@]} - 1)) targets each"
+  node_labels
   for i in "${!nodes[@]}"; do
     node=${nodes[$i]}
     if [[ $path == overlay && -z ${under[$node]:-} ]]; then

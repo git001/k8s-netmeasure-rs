@@ -71,6 +71,9 @@ with a `run.log` if the Job produced nothing).
 
 - One Job per source node, all in parallel; each measures every other node's
   listener (overlay: pod IPs, underlay: node IPs). A node never measures itself.
+- Every run declares its node's zone and instance type from the node labels
+  (`topology.kubernetes.io/zone`, `node.kubernetes.io/instance-type`), so result
+  files and `report` carry them; a node without these labels leaves them `unknown`.
 - Overlay sources need the node listener on their own node; a node without one is
   skipped and logged.
 - The Job writes into an `emptyDir`; the pod waits after the run so that the file
