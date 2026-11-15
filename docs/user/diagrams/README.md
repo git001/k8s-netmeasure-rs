@@ -17,4 +17,5 @@ for f in docs/user/diagrams/*.dot; do dot -Tsvg "$f" -o "${f%.dot}.svg"; done
 | [cycle-validity.dot](cycle-validity.dot) | the validity reasons and annotations of a cycle |
 | [listen-probes.dot](listen-probes.dot) | `listen` lifecycle and its Kubernetes probe answers |
 | [node-listener.dot](node-listener.dot) | overlay measurement with a node listener (`--node-context-from`) |
+| [deployment.dot](deployment.dot) | example manifests: overlay above underlay, measured paths and control requests between nodes |
 | [threads.dot](threads.dot) | threads of `run` and `listen` and how signals are handled |

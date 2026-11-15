@@ -1,0 +1,17 @@
+# The listen side: namespace, underlay service account, both DaemonSets, policy.
+#
+#   oc apply -k deploy/examples/listen        (or kubectl apply -k)
+#
+# CI publishes the image as sha-<12-char commit> and, for releases, <version>; set
+# one of them below, or better a digest (`digest: sha256:...` instead of newTag).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - rbac-underlay.yaml
+  - listen-underlay.yaml
+  - listen-overlay.yaml
+  - networkpolicy-listen-overlay.yaml
+images:
+  - name: ghcr.io/git001/k8s-netmeasure-rs
+    newTag: SET-ME

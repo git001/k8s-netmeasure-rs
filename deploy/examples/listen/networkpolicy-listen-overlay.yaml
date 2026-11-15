@@ -1,0 +1,33 @@
+# Only overlay run pods of this namespace may reach the overlay listen pods.
+#
+# - Ingress to 17700 (measured) and 17701 (control) from pods labelled
+#   app.kubernetes.io/component=run-overlay; everything else is denied.
+# - Kubelet probes come from the node itself; common CNIs (OVN-Kubernetes, Calico,
+#   Cilium) allow them regardless of NetworkPolicy. If probes fail after applying
+#   this policy, check your CNI's documentation on host-to-pod traffic.
+# - Does not protect the underlay (hostNetwork) pods: NetworkPolicy does not apply
+#   to them.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: netmeasure-listen-overlay
+  namespace: netmeasure
+  labels:
+    app.kubernetes.io/name: k8s-netmeasure
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: k8s-netmeasure
+      app.kubernetes.io/component: listen-overlay
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: k8s-netmeasure
+              app.kubernetes.io/component: run-overlay
+      ports:
+        - protocol: TCP
+          port: 17700
+        - protocol: TCP
+          port: 17701

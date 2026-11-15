@@ -1,0 +1,17 @@
+# Volume for result files; outlives the Job pods.
+#
+# ReadWriteOnce is enough when the run Jobs execute one after another (or all on
+# the same node). For concurrent runs on several source nodes use a ReadWriteMany
+# storage class, or one claim per Job.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: netmeasure-results
+  namespace: netmeasure
+  labels:
+    app.kubernetes.io/name: k8s-netmeasure
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi

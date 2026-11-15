@@ -1,0 +1,77 @@
+# Underlay run: a hostNetwork pod on the source node measures the underlay listen
+# pods on the target nodes' IPs (NIC, driver, hypervisor, fabric; no CNI).
+#
+# Before applying, set:
+#   - nodeSelector: the source node;
+#   - --target: the node IPs of the target nodes:
+#       oc get nodes -o wide
+#   - PHASE: e.g. baseline, then after the change candidate.
+# Needs the netmeasure-underlay service account (../listen/rbac-underlay.yaml).
+# A Job's pod template is immutable: delete the Job before applying a changed one.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: netmeasure-run-underlay
+  namespace: netmeasure
+  labels:
+    app.kubernetes.io/name: k8s-netmeasure
+    app.kubernetes.io/component: run-underlay
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: k8s-netmeasure
+        app.kubernetes.io/component: run-underlay
+    spec:
+      restartPolicy: Never
+      serviceAccountName: netmeasure-underlay
+      automountServiceAccountToken: false
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      terminationGracePeriodSeconds: 30
+      nodeSelector:
+        kubernetes.io/hostname: SOURCE-NODE
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: run
+          image: ghcr.io/git001/k8s-netmeasure-rs
+          args:
+            - run
+            - --target=192.0.2.11:17700
+            - --target=192.0.2.12:17700
+            - --path=underlay
+            - --label=phase=$(PHASE)
+            - --output=/results/underlay-$(PHASE)-$(NODE_NAME).json
+            # The node's own NIC is visible here; no --node-context-from needed.
+            # --control-port 17702 is on the node IP with hostNetwork; keep it off
+            # unless probes are needed.
+          env:
+            - name: PHASE
+              value: baseline
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            requests:
+              cpu: "1"
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: results
+              mountPath: /results
+      volumes:
+        - name: results
+          persistentVolumeClaim:
+            claimName: netmeasure-results

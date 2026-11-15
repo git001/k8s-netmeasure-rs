@@ -62,6 +62,10 @@ LABEL org.opencontainers.image.title="k8s-netmeasure" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.licenses="MIT OR Apache-2.0"
 
+# tar: `oc cp` / `kubectl cp` need it in the container, e.g. to fetch result files.
+RUN microdnf -y install --setopt=install_weak_deps=0 --nodocs tar \
+ && microdnf clean all
+
 COPY --from=builder /src/target/release/k8s-netmeasure /usr/local/bin/k8s-netmeasure
 COPY LICENSE-MIT LICENSE-APACHE /licenses/
 

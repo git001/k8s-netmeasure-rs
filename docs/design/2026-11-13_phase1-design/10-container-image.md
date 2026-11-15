@@ -28,6 +28,10 @@ deliverable**, not Phase 2. Phase 2 adds only the chart around it.
    - No `EXPOSE`-based probing assumptions; ports come from flags.
    - The image still contains `bash` and `microdnf` (part of ubi-minimal), which helps
      with `oc exec` debugging. The binary does not need either.
+   - **`tar` is added** (decided in milestone 3e2): `oc cp` / `kubectl cp` need it to
+     copy result files out of a pod; `oc exec … cat > file` is the fragile
+     alternative (binary-unsafe through some terminals, silent truncation on a broken
+     stream). `tar` is a single small package without new libraries.
    - **No full libcurl** (revised in review round 1). An earlier version of this design
      swapped `libcurl-minimal` for the full `libcurl` so that `curl -v telnet://…`
      would work. That pulls in libraries for LDAP, SSH, SMB and more, which the tool

@@ -1,0 +1,94 @@
+# Underlay listen: one per node, with hostNetwork, on the node IP.
+#
+# - It is the target of underlay measurements (node IP:17700) and the node listener
+#   of overlay pods on the same node (node IP:17701, --node-context-from).
+# - Its /v1/context lists every node's NIC family, driver and ring sizes: take that
+#   inventory before choosing pairs, and again after reboots or machine replacement.
+# - NetworkPolicy does not apply to hostNetwork pods: ports 17700 and 17701 are open
+#   on the node address. Restrict them with the node firewall or the cloud security
+#   group, and delete this DaemonSet when the test series is over. Never expose it
+#   to the internet.
+# - Only one hostNetwork listen per node: a second one would collide on the ports.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: netmeasure-listen-underlay
+  namespace: netmeasure
+  labels:
+    app.kubernetes.io/name: k8s-netmeasure
+    app.kubernetes.io/component: listen-underlay
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: k8s-netmeasure
+      app.kubernetes.io/component: listen-underlay
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: k8s-netmeasure
+        app.kubernetes.io/component: listen-underlay
+    spec:
+      serviceAccountName: netmeasure-underlay
+      automountServiceAccountToken: false
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      # Worker nodes only. A hostNetwork pod on a control plane node is effectively
+      # trusted like root on the cluster; do not widen this without need.
+      nodeSelector:
+        node-role.kubernetes.io/worker: ""
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: listen
+          image: ghcr.io/git001/k8s-netmeasure-rs
+          args:
+            - listen
+            # --control-bind auto (default) binds the node IP; probes reach it there.
+            # Zone and instance type stay unknown in Phase 1 unless declared with
+            # --zone / --instance-type (e.g. one DaemonSet per node pool).
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          ports:
+            - name: measured
+              containerPort: 17700
+              protocol: TCP
+            - name: control
+              containerPort: 17701
+              protocol: TCP
+          # Design §4: a bad network never fails a probe; only a stalled thread does.
+          startupProbe:
+            httpGet: { path: /startup, port: control }
+            periodSeconds: 2
+            failureThreshold: 30
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet: { path: /live, port: control }
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 2
+          readinessProbe:
+            httpGet: { path: /ready, port: control }
+            periodSeconds: 5
+            failureThreshold: 1
+            timeoutSeconds: 2
+          resources:
+            requests:
+              cpu: 250m
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

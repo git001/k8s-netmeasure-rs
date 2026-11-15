@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Example manifests in `deploy/examples/` (milestone 3e2): `listen` as underlay
+  (hostNetwork, OpenShift SCC `hostnetwork-v2`) and overlay DaemonSet with
+  `--node-context-from $(HOST_IP):17701`, a NetworkPolicy for the overlay `listen`,
+  overlay and underlay `run` Jobs writing to a volume, and a pod to fetch the result
+  files; no Service, Route or Ingress. User guide section and diagram
+  `deployment.dot` (overlay above underlay, measured and control paths).
+- The container image contains `tar`, so `oc cp` / `kubectl cp` can copy result
+  files out of a pod.
 - `run --shutdown-deadline` (default 10s, design §8): after the first SIGTERM/SIGINT
   no new cycle starts; the running cycle is finished if its remaining slots fit into
   the deadline, else it ends at once as `interrupted`. Recorded as

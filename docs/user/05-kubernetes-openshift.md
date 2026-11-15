@@ -2,8 +2,20 @@
 
 [User guide](README.md) · previous: [`run`](04-run.md) · next: [Troubleshooting](06-troubleshooting.md)
 
-Example manifests (`listen` DaemonSet for both paths, `run` Job) *follow*. Until then
-the patterns below work with plain `kubectl` / `oc`.
+For a test series use the [example manifests](#example-manifests); for a quick
+check the [ad hoc patterns](#quick-ad-hoc-runs-without-manifests) work with plain
+`kubectl` / `oc`.
+
+![Overlay and underlay](diagrams/deployment.svg)
+
+- **Overlay** (top): `run` connects to the pod IP of the `listen` pod on node B. The
+  connect passes the CNI datapath of both nodes (encapsulation, connection
+  tracking), the NICs and the fabric.
+- **Underlay** (bottom): `run` with `hostNetwork` connects to node B's IP. Only NIC,
+  driver, hypervisor and fabric are on the path.
+- **Control requests** (dashed): `run` reads every target's control port. An overlay
+  pod reads its NIC path from the underlay `listen` on **its own node** (the node
+  listener, `$(HOST_IP):17701`); that request never leaves the node.
 
 ## Which pod for which path
 
@@ -47,6 +59,55 @@ debug pod with `oc cp` lands in the pod, not on the host. The debug pod is
 privileged and runs as root: fine for `selftest` and `probe`, but its CPU and cgroup
 values are not those of a normal measuring pod.
 
+## Example manifests
+
+[`deploy/examples/`](../../deploy/examples/README.md) has two kustomize directories;
+apply them with `oc apply -k` (or `kubectl apply -k`). They create no Service, Route
+or Ingress.
+
+| Directory | Creates |
+|---|---|
+| `listen/` | namespace `netmeasure`; service account `netmeasure-underlay` (OpenShift: may use SCC `hostnetwork-v2`); `listen` DaemonSets for underlay (hostNetwork) and overlay; a NetworkPolicy that lets only overlay `run` pods reach the overlay `listen` pods |
+| `run/` | a volume for result files; one `run` Job, overlay or underlay; a pod to fetch the files |
+
+1. Set the image in both `kustomization.yaml` (`newTag: SET-ME`; CI publishes
+   `sha-<12-char commit>` and release versions; a digest is better).
+2. Check, then apply the listen side:
+   ```sh
+   oc apply -k deploy/examples/listen --dry-run=server
+   oc apply -k deploy/examples/listen
+   oc -n netmeasure get pods -o wide
+   ```
+   The overlay pods restart until the underlay pod on their node is ready: they
+   refuse to start without their node listener.
+3. Take the NIC inventory: `/v1/context` of every underlay `listen` lists its node's
+   NIC family, driver and rings. Choose source and target nodes from it.
+   ```sh
+   for ip in $(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}'); do
+     curl -s "http://$ip:17701/v1/context" | jq -c '{node: .node_name.value, nic: .nic}'
+   done
+   ```
+4. In `run/run-overlay.yaml` (or `run-underlay.yaml`) set the source node
+   (`SOURCE-NODE`), the targets (overlay: pod IPs of the overlay `listen` pods;
+   underlay: node IPs) and `PHASE`, enable the Job in `run/kustomization.yaml` and
+   apply it:
+   ```sh
+   oc apply -k deploy/examples/run
+   oc -n netmeasure logs -f job/netmeasure-run-overlay
+   ```
+5. Fetch the result: enable `results-reader.yaml`, apply again, then
+   ```sh
+   oc -n netmeasure exec netmeasure-results-reader -- ls /results
+   oc -n netmeasure cp netmeasure-results-reader:/results ./results
+   ```
+6. For the next run delete the Job first (its pod template is immutable), change
+   `PHASE`, apply again. Delete the namespace when the test series is over.
+
+The Jobs use requests = limits (1 CPU, Guaranteed QoS), `backoffLimit: 0` (a
+measurement is never retried automatically) and `terminationGracePeriodSeconds: 30`.
+A ReadWriteOnce volume serialises Jobs on different source nodes; use ReadWriteMany
+or one claim per Job for concurrent runs.
+
 ## Overlay with a node listener
 
 For overlay measurements run two `listen` on every node involved: one with
@@ -81,7 +142,9 @@ env:
 ```
 
 `listen` and `run` use `$NODE_NAME` unless `--node-name` is given. Zone and instance
-type are declared with `--zone` / `--instance-type` (Phase 1 reads no API).
+type are declared with `--zone` / `--instance-type`. They are node labels
+(`topology.kubernetes.io/zone`, `node.kubernetes.io/instance-type`), which the
+Downward API cannot read, and Phase 1 reads no API; Phase 2 reads them from the API.
 
 ## Security
 

@@ -1,0 +1,15 @@
+# Namespace for all example resources.
+#
+# Plain Kubernetes: Pod Security `baseline` and `restricted` forbid hostNetwork, so
+# the underlay pods need `enforce: privileged` here. They still drop every
+# capability and run as non-root (see listen-underlay.yaml).
+# OpenShift: the SCC decides (restricted-v2 for normal pods, hostnetwork-v2 for the
+# underlay service account, see rbac-underlay.yaml). `warn` and `audit` are left to
+# OpenShift's label synchronization; setting them here would switch it off.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: netmeasure
+  labels:
+    app.kubernetes.io/name: k8s-netmeasure
+    pod-security.kubernetes.io/enforce: privileged

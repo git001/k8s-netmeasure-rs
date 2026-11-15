@@ -1,0 +1,66 @@
+// Deployment of the example manifests in three bands: overlay (normal pods), the
+// node's host network namespace (hostNetwork pods and the CNI datapath), and the
+// hardware below. Columns are nodes: A (source) left, B (target) right.
+digraph deployment {
+  graph [rankdir=TB, fontname="Helvetica", fontsize=11, nodesep=0.45, ranksep=0.7, pad=0.3,
+         newrank=true, label="Overlay and underlay: who talks to whom (deploy/examples)",
+         labelloc=t];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10,
+         fillcolor="#eef3fb", color="#4a6fa5"];
+  edge  [fontname="Helvetica", fontsize=9, color="#555555"];
+
+  subgraph cluster_overlay {
+    label="Overlay: normal pods, pod IP (NetworkPolicy applies)";
+    style="rounded,filled"; fillcolor="#f5f8fd"; color="#4a6fa5"; fontsize=10;
+    o_run    [label="run (Job)\nnode A\n--node-context-from $(HOST_IP):17701"];
+    o_listen [label="listen (DaemonSet)\nnode B, :17700 / :17701\n--node-context-from $(HOST_IP):17701"];
+  }
+
+  subgraph cluster_underlay {
+    label="Underlay: host network namespace, node IP (hostNetwork pods; NetworkPolicy does not apply)";
+    style="rounded,filled"; fillcolor="#f3f9f2"; color="#2e7d32"; fontsize=10; labelloc=b;
+    node [fillcolor="#e3f2e1", color="#2e7d32"];
+    cniA      [label="CNI datapath A\n(encapsulation,\nconntrack)", fillcolor="#f4f4f4", color="#777777"];
+    u_listenA [label="listen (DaemonSet)\nnode A = node listener\n:17700 / :17701"];
+    u_run     [label="run (Job)\nnode A"];
+    u_listenB [label="listen (DaemonSet)\nnode B = node listener\n:17700 / :17701"];
+    cniB      [label="CNI datapath B", fillcolor="#f4f4f4", color="#777777"];
+  }
+
+  subgraph cluster_hw {
+    label="Hardware and infrastructure";
+    style="rounded,dashed"; color="#888888"; fontsize=10;
+    node [fillcolor="#f4f4f4", color="#777777"];
+    nicA   [label="NIC node A\nfamily, driver, rings", shape=component];
+    fabric [label="hypervisor / fabric", shape=ellipse];
+    nicB   [label="NIC node B\nfamily, driver, rings", shape=component];
+  }
+
+  // Bands and columns.
+  { rank=same; o_run; o_listen; }
+  { rank=same; cniA; u_listenA; u_run; u_listenB; cniB; }
+  { rank=same; nicA; fabric; nicB; }
+  edge [style=invis];
+  o_run -> o_listen;
+  cniA -> u_listenA -> u_run -> u_listenB -> cniB;
+  nicA -> fabric -> nicB;
+  edge [style=solid];
+
+  // Overlay measurement: pod to pod, through both CNI datapaths and both NICs.
+  o_run -> cniA   [xlabel="measured connects\npod IP B:17700", color="#1f5fbf", fontcolor="#1f5fbf", penwidth=1.8];
+  cniA -> nicA    [color="#1f5fbf", penwidth=1.8];
+  nicA -> fabric  [color="#1f5fbf", penwidth=1.8];
+  fabric -> nicB  [color="#1f5fbf", penwidth=1.8];
+  cniB -> nicB    [color="#1f5fbf", penwidth=1.8, dir=back];
+  o_listen -> cniB [color="#1f5fbf", penwidth=1.8, dir=back];
+
+  // Underlay measurement: node IP to node IP, no CNI.
+  u_run -> nicA     [label="measured connects\nnode IP B:17700", color="#2e7d32", fontcolor="#2e7d32", penwidth=1.8];
+  u_listenB -> nicB [color="#2e7d32", penwidth=1.8, dir=back];
+
+  // Control requests: dashed, no measurement.
+  o_run -> u_listenA    [label=" same node:\n boot_id, NIC path", style=dashed];
+  o_listen -> u_listenB [label=" same node:\n every second", style=dashed];
+  o_run -> o_listen     [label="/v1/info, /v1/snapshot\npod IP B:17701", style=dashed];
+  u_run -> u_listenB    [label="/v1/info, /v1/snapshot\nnode IP B:17701", style=dashed];
+}

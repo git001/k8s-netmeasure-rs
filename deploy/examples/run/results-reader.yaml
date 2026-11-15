@@ -1,0 +1,48 @@
+# A finished Job's pod cannot be copied from. This pod mounts the results volume
+# read-only, so the files can be fetched (enable it in kustomization.yaml):
+#
+#   oc -n netmeasure exec netmeasure-results-reader -- ls /results
+#   oc -n netmeasure cp netmeasure-results-reader:/results ./results
+#   oc -n netmeasure delete pod netmeasure-results-reader
+#
+# With a ReadWriteOnce volume it can only start once no Job pod holds the volume on
+# another node.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netmeasure-results-reader
+  namespace: netmeasure
+  labels:
+    app.kubernetes.io/name: k8s-netmeasure
+    app.kubernetes.io/component: results-reader
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: reader
+      image: ghcr.io/git001/k8s-netmeasure-rs
+      command: ["sleep", "infinity"]
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+      volumeMounts:
+        - name: results
+          mountPath: /results
+          readOnly: true
+  volumes:
+    - name: results
+      persistentVolumeClaim:
+        claimName: netmeasure-results

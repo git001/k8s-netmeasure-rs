@@ -1,0 +1,17 @@
+# The measuring side: results volume, one run Job, later the results reader.
+#
+#   oc apply -k deploy/examples/run          (or kubectl apply -k)
+#
+# Requires deploy/examples/listen first (namespace, service account, targets).
+# Enable one Job at a time; after it finished, enable results-reader.yaml to fetch
+# the files. Set the image as in ../listen/kustomization.yaml.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - pvc-results.yaml
+  - run-overlay.yaml
+  # - run-underlay.yaml
+  # - results-reader.yaml
+images:
+  - name: ghcr.io/git001/k8s-netmeasure-rs
+    newTag: SET-ME
