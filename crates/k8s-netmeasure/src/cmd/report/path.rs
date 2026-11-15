@@ -5,43 +5,35 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use netmeasure_core::stats::compare::{Comparison, Plan, compare};
-use netmeasure_core::stats::series::Series;
 use netmeasure_core::stats::side::{RunInput, Side};
 
 use super::load::RunData;
 use super::{block, checks, text};
 
-/// The runs of one side of one path with their targets split per stratum.
+/// The runs of one side of one path (their targets already split per stratum).
 pub struct Prepared<'a> {
     pub runs: Vec<&'a RunData>,
-    pub strata: Vec<BTreeMap<String, Series>>,
 }
 
 impl<'a> Prepared<'a> {
-    /// The runs `idx` of `runs`, their targets split per stratum; `families` maps
-    /// nodes to the family they reported as a source.
-    pub fn new(runs: &'a [RunData], idx: &[usize], families: &BTreeMap<String, String>) -> Self {
+    pub fn new(runs: &'a [RunData], idx: &[usize]) -> Self {
         Prepared {
             runs: idx.iter().map(|&i| &runs[i]).collect(),
-            strata: idx
-                .iter()
-                .map(|&i| super::strata::split(&runs[i], families))
-                .collect(),
         }
     }
 
     fn keys(&self) -> BTreeSet<&str> {
-        self.strata
+        self.runs
             .iter()
-            .flat_map(|m| m.keys().map(String::as_str))
+            .flat_map(|r| r.strata.keys().map(String::as_str))
             .collect()
     }
 
     /// Source nodes as the top level, their runs below, for one stratum.
     fn side(&self, stratum: &str) -> Side<'_> {
         let mut nodes: BTreeMap<&str, Vec<RunInput<'_>>> = BTreeMap::new();
-        for (r, m) in self.runs.iter().zip(&self.strata) {
-            if let Some(series) = m.get(stratum) {
+        for r in &self.runs {
+            if let Some(series) = r.strata.get(stratum) {
                 nodes.entry(r.node.as_str()).or_default().push(RunInput {
                     series,
                     floor_samples: r.floor,
@@ -56,9 +48,8 @@ impl<'a> Prepared<'a> {
     fn runs_with(&self, stratum: &str) -> Vec<&RunData> {
         self.runs
             .iter()
-            .zip(&self.strata)
-            .filter(|(_, m)| m.contains_key(stratum))
-            .map(|(r, _)| *r)
+            .filter(|r| r.strata.contains_key(stratum))
+            .copied()
             .collect()
     }
 
@@ -87,6 +78,25 @@ pub fn strata(b: &Prepared, a: &Prepared) -> (Vec<String>, Vec<String>) {
     (both, one)
 }
 
+/// Memory for resampling buffers: every bootstrap thread holds one resampled side.
+const BUFFER_BUDGET: usize = 1 << 30;
+
+/// `plan` with as many threads as the buffer budget allows, at least one.
+fn within_budget(plan: &Plan, b: &Side, a: &Side) -> Plan {
+    let n = |s: &Side| -> usize {
+        s.runs()
+            .flat_map(|r| &r.series.segments)
+            .map(|g| g.values.len())
+            .sum()
+    };
+    // 8 bytes per value, 1 per mark, doubled for vector growth, rounded up.
+    let per_thread = 20 * n(b).max(n(a)).max(1);
+    Plan {
+        threads: (BUFFER_BUDGET / per_thread).clamp(1, plan.threads.max(1)),
+        ..plan.clone()
+    }
+}
+
 /// Everything the text output needs for one stratum.
 pub struct StratumResult<'a> {
     pub stratum: &'a str,
@@ -103,13 +113,17 @@ pub fn report(path: &str, b: &Prepared, a: &Prepared, plan: &Plan) {
         replicates: plan.replicates.min(2000),
         ..plan.clone()
     };
-    let loopback = compare(&b.loopback(), &a.loopback(), &loop_plan);
+    let (lb, la) = (b.loopback(), a.loopback());
+    let loopback = compare(&lb, &la, &within_budget(&loop_plan, &lb, &la));
     let (both, one) = strata(b, a);
     text::path(path, &loopback, both.len());
     for s in &both {
         let result = StratumResult {
             stratum: s,
-            targets: compare(&b.side(s), &a.side(s), plan),
+            targets: {
+                let (sb, sa) = (b.side(s), a.side(s));
+                compare(&sb, &sa, &within_budget(plan, &sb, &sa))
+            },
             evidence: checks::evidence(&b.runs_with(s), &a.runs_with(s)),
         };
         block::stratum(&result, plan);

@@ -9,6 +9,7 @@ pub mod bootstrap;
 pub mod compare;
 pub mod describe;
 pub mod normal;
+pub mod parallel;
 pub mod quantile;
 pub mod rate;
 pub mod segment;

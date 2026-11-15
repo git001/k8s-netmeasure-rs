@@ -43,6 +43,7 @@ fn tally(s: &Scenario, seed: u64) -> Tally {
             replicates: B,
             seed: seed ^ rep as u64,
             block_override: s.block,
+            threads: 1,
         };
         let q = &compare(&side(&before), &side(&after), &plan).quantiles[0];
         if q.interval

@@ -18,7 +18,7 @@ struct Load {
 
 impl Load {
     fn of(r: &RunData) -> Self {
-        let c = &r.file.run.config;
+        let c = &r.config;
         Self {
             interval_ns: c.interval_ns,
             loopback_every: c.loopback_every,
@@ -45,7 +45,7 @@ pub fn check(path: &str, before: &[&RunData], after: &[&RunData]) -> Result<(), 
         for r in runs {
             sets.entry(Load::of(r))
                 .or_default()
-                .push(format!("{side} {} {}", r.node, r.file.run.run_id));
+                .push(format!("{side} {} {}", r.node, r.run_id));
         }
     }
     if sets.len() <= 1 {

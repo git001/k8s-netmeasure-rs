@@ -3,11 +3,9 @@
 //! quantile with a verdict, the other quantiles descriptive, failure rates with
 //! their own verdict family, SYN retransmissions as diagnostics.
 
-use rand::SeedableRng;
-use rand_chacha::ChaCha8Rng;
-
 use super::blocklen::BlockChoice;
 use super::describe::{Estimate, describe};
+use super::parallel::{Sides, replicates};
 use super::rate::{self, RateComparison};
 use super::segment::{CENSORED, mark};
 use super::side::{Replicate, Side};
@@ -25,6 +23,8 @@ pub struct Plan {
     pub replicates: usize,
     pub seed: u64,
     pub block_override: Option<f64>,
+    /// Threads for the replicates; the result does not depend on it.
+    pub threads: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -72,16 +72,19 @@ pub fn compare(reference: &Side, after: &Side, plan: &Plan) -> Comparison {
     let ratio = matches!(plan.margin, Some(Margin::Relative(_)));
     let (len_r, blocks_r) = reference.block_lengths(plan.primary, plan.block_override);
     let (len_a, blocks_a) = after.block_lengths(plan.primary, plan.block_override);
-    let mut rng_r = ChaCha8Rng::seed_from_u64(plan.seed);
-    let mut rng_a = ChaCha8Rng::seed_from_u64(plan.seed ^ 0x9E37_79B9_7F4A_7C15);
-    let reps: Vec<(Replicate, Replicate)> = (0..plan.replicates)
-        .map(|_| {
-            (
-                reference.replicate(&plan.quantiles, len_r, &mut rng_r),
-                after.replicate(&plan.quantiles, len_a, &mut rng_a),
-            )
-        })
-        .collect();
+    let sides = Sides {
+        reference,
+        after,
+        block_reference: len_r,
+        block_after: len_a,
+    };
+    let reps: Vec<(Replicate, Replicate)> = replicates(
+        &sides,
+        &plan.quantiles,
+        plan.replicates,
+        plan.seed,
+        plan.threads,
+    );
     let (pooled_r, pooled_a) = (reference.pooled_sorted(), after.pooled_sorted());
     let timeout = timeout_of(reference).max(timeout_of(after));
     let quantiles = plan
@@ -164,6 +167,9 @@ fn summary(
 
 #[cfg(test)]
 mod tests {
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
     use super::*;
     use crate::stats::series::Series;
     use crate::stats::side::RunInput;
@@ -203,6 +209,7 @@ mod tests {
             replicates: 400,
             seed: 7,
             block_override: None,
+            threads: 2,
         }
     }
 

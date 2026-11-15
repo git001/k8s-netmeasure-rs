@@ -7,7 +7,8 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use netmeasure_core::schema::result::ResultFile;
+use netmeasure_core::schema::control::NodeContext;
+use netmeasure_core::schema::result::{Config, ResultFile};
 use netmeasure_core::stats::blocklen;
 use netmeasure_core::stats::series::{Series, series};
 use netmeasure_util::time::parse_rfc3339_ns;
@@ -19,10 +20,17 @@ pub struct TargetSeries {
     pub series: Series,
 }
 
-/// One run, prepared for the statistics.
+/// One run, prepared for the statistics. Only what the report needs is kept; the
+/// parsed file is dropped after reading (about 10 bytes per sample remain).
 pub struct RunData {
-    pub file: ResultFile,
+    pub run_id: String,
+    pub config: Config,
+    /// The source's node context at the start of the run.
+    pub context: NodeContext,
+    /// Real targets until `strata::assign` moves them into `strata`.
     pub targets: Vec<TargetSeries>,
+    /// Stratum `source family → target family` → the matching targets pooled.
+    pub strata: BTreeMap<String, Series>,
     pub loopback: Series,
     /// Floor of the block length in samples of one target series (§10.2).
     pub floor: f64,
@@ -101,14 +109,7 @@ fn prepare(path: PathBuf, file: ResultFile) -> Result<RunData, String> {
             .map(super::checks::family)
             .filter(|f| f != "unknown")
     };
-    let targets: Vec<TargetSeries> = real
-        .iter()
-        .map(|s| TargetSeries {
-            name: s.name.clone(),
-            family: family_of(s.target),
-            series: s.clone(),
-        })
-        .collect();
+    let families: Vec<Option<String>> = real.iter().map(|s| family_of(s.target)).collect();
     let c = &file.run.config;
     let every = u64::from(c.loopback_every);
     let spacing = |lo| blocklen::spacing_ns(c.interval_ns, real.len() as u64, every, lo);
@@ -124,9 +125,22 @@ fn prepare(path: PathBuf, file: ResultFile) -> Result<RunData, String> {
     let time =
         |t: &str| parse_rfc3339_ns(t).ok_or_else(|| format!("{}: bad time {t}", path.display()));
     let (start_ns, end_ns) = (time(&file.run.started_at)?, time(&file.run.ended_at)?);
+    let targets = real
+        .into_iter()
+        .zip(families)
+        .map(|(series, family)| TargetSeries {
+            name: series.name.clone(),
+            family,
+            series,
+        })
+        .collect();
+    let ResultFile { run, source, .. } = file;
     Ok(RunData {
-        file,
+        run_id: run.run_id,
+        config: run.config,
+        context: source.context_before,
         targets,
+        strata: BTreeMap::new(),
         loopback,
         floor,
         loopback_floor,
@@ -143,16 +157,10 @@ pub fn by_path(
 ) -> BTreeMap<String, (Vec<usize>, Vec<usize>)> {
     let mut m: BTreeMap<String, (Vec<usize>, Vec<usize>)> = BTreeMap::new();
     for (i, r) in before.iter().enumerate() {
-        m.entry(r.file.run.config.path.clone())
-            .or_default()
-            .0
-            .push(i);
+        m.entry(r.config.path.clone()).or_default().0.push(i);
     }
     for (i, r) in after.iter().enumerate() {
-        m.entry(r.file.run.config.path.clone())
-            .or_default()
-            .1
-            .push(i);
+        m.entry(r.config.path.clone()).or_default().1.push(i);
     }
     m
 }

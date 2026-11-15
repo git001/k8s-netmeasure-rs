@@ -125,7 +125,11 @@ Wall time below: `pair` mode, 10 ms interval, warm-up 50, loopback every 10th sl
   per-run value for the primary quantile, used for all quantiles and the rates;
   latencies and per-attempt marks (failure, SYN retransmission, unknown) are
   resampled with the same block length; the two sides use independent `ChaCha8`
-  streams derived from the one recorded seed. The cross-group correlation check is
+  streams derived from the one recorded seed. *Changed 2026-11-15:* replicate `i`
+  draws from streams `2i` (reference) and `2i + 1` (after) of that seed, so the
+  replicates run on several threads and the result does not depend on the thread
+  count; `report` limits the threads so that their resampling buffers stay within
+  1 GiB. The cross-group correlation check is
   implemented as a pure computation; aligning the runs in wall-clock time is part of
   `report` (milestone 5). First real check (2026-11-15, unchanged runs, relative
   margin 10 %, k = 2): p99 `equivalent` or `inconclusive` on every pair, never

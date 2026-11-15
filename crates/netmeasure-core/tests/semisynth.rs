@@ -88,6 +88,7 @@ fn split(nodes: &[&Vec<Run>], effect: f64, seed: u64) -> (Option<(f64, f64)>, Op
         replicates: REPLICATES,
         seed,
         block_override: None,
+        threads: 1,
     };
     let q = &compare(&side_a, &side_b, &plan).quantiles[0];
     (q.interval, q.verdict)

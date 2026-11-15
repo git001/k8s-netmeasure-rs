@@ -17,7 +17,7 @@ pub const UNKNOWN: &str = "unknown";
 /// Node → NIC family as reported by the runs on that node (the source contexts).
 pub fn node_families(runs: &[&RunData]) -> BTreeMap<String, String> {
     runs.iter()
-        .map(|r| (r.node.clone(), family(&r.file.source.context_before)))
+        .map(|r| (r.node.clone(), family(&r.context)))
         .filter(|(_, f)| f != UNKNOWN)
         .collect()
 }
@@ -26,12 +26,12 @@ pub fn name(source: &str, target: &str) -> String {
     format!("{source} → {target}")
 }
 
-/// One run's real targets pooled per stratum (blocks never cross targets, because
-/// every target's stretches stay separate segments).
-pub fn split(run: &RunData, nodes: &BTreeMap<String, String>) -> BTreeMap<String, Series> {
-    let source = family(&run.file.source.context_before);
+/// Moves a run's real targets into its strata, pooled per stratum (blocks never cross
+/// targets, because every target's stretches stay separate segments).
+pub fn assign(run: &mut RunData, nodes: &BTreeMap<String, String>) {
+    let source = family(&run.context);
     let mut out: BTreeMap<String, Series> = BTreeMap::new();
-    for t in &run.targets {
+    for t in std::mem::take(&mut run.targets) {
         let target = t
             .family
             .clone()
@@ -45,9 +45,9 @@ pub fn split(run: &RunData, nodes: &BTreeMap<String, String>) -> BTreeMap<String
             timeout_ns: t.series.timeout_ns,
             segments: Vec::new(),
         });
-        s.segments.extend(t.series.segments.iter().cloned());
+        s.segments.extend(t.series.segments);
     }
-    out
+    run.strata = out;
 }
 
 /// Instance types that occur with more than one NIC family, with the families
@@ -55,7 +55,7 @@ pub fn split(run: &RunData, nodes: &BTreeMap<String, String>) -> BTreeMap<String
 pub fn mixed_instance_types(runs: &[&RunData]) -> Vec<(String, Vec<String>)> {
     let mut m: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for r in runs {
-        let c = &r.file.source.context_before;
+        let c = &r.context;
         if let Some(t) = &c.instance_type.value {
             m.entry(t.clone()).or_default().insert(family(c));
         }

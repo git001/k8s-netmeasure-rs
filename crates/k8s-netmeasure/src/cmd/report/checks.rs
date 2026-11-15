@@ -62,7 +62,7 @@ pub fn fields(before: &[&RunData], after: &[&RunData], declared: Factor) -> Vec<
     ];
     let set = |rs: &[&RunData], get: Get| -> BTreeSet<String> {
         rs.iter()
-            .map(|r| get(&r.file.source.context_before).unwrap_or_else(|| "unknown".into()))
+            .map(|r| get(&r.context).unwrap_or_else(|| "unknown".into()))
             .collect()
     };
     list.iter()
@@ -89,9 +89,7 @@ pub fn node_mismatches(
     let per_node = |rs: &[&RunData], get: NodeGet| {
         let mut m: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         for r in rs {
-            m.entry(r.node.clone())
-                .or_default()
-                .insert(get(&r.file.source.context_before));
+            m.entry(r.node.clone()).or_default().insert(get(&r.context));
         }
         m
     };

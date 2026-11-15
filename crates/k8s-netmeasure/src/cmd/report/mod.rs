@@ -38,10 +38,14 @@ pub fn run(args: &ReportArgs) -> ExitCode {
 
 fn report(args: &ReportArgs) -> Result<(), (u8, String)> {
     let usage = |e: String| (exit::USAGE, e);
-    let before = load::load(&args.before).map_err(usage)?;
-    let after = load::load(&args.after).map_err(usage)?;
+    let mut before = load::load(&args.before).map_err(usage)?;
+    let mut after = load::load(&args.after).map_err(usage)?;
     if before.is_empty() || after.is_empty() {
         return Err(usage("no result files on one side".into()));
+    }
+    for side in [&mut before, &mut after] {
+        let families = strata::node_families(&side.iter().collect::<Vec<_>>());
+        side.iter_mut().for_each(|r| strata::assign(r, &families));
     }
     let before_refs: Vec<&RunData> = before.iter().collect();
     let after_refs: Vec<&RunData> = after.iter().collect();
@@ -74,17 +78,13 @@ fn report(args: &ReportArgs) -> Result<(), (u8, String)> {
         let a: Vec<&RunData> = ai.iter().map(|&i| &after[i]).collect();
         params::check(path, &b, &a).map_err(|e| (exit::COMPARISON_REFUSED, e))?;
     }
-    let (fam_b, fam_a) = (
-        strata::node_families(&before_refs),
-        strata::node_families(&after_refs),
-    );
     let paths: Vec<(&String, path::Prepared, path::Prepared)> = groups
         .iter()
         .map(|(p, (bi, ai))| {
             (
                 p,
-                path::Prepared::new(&before, bi, &fam_b),
-                path::Prepared::new(&after, ai, &fam_a),
+                path::Prepared::new(&before, bi),
+                path::Prepared::new(&after, ai),
             )
         })
         .collect();
@@ -108,6 +108,7 @@ fn report(args: &ReportArgs) -> Result<(), (u8, String)> {
         replicates: args.replicates as usize,
         seed: args.seed.unwrap_or(time::realtime_ns() as u64),
         block_override: None,
+        threads: std::thread::available_parallelism().map_or(1, |n| n.get()),
     };
     text::header(args, &plan, overlap);
     let all: Vec<&RunData> = before_refs.iter().chain(&after_refs).copied().collect();

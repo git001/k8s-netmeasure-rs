@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after `PENDING_S` is given up with the scheduler's reason; run pods request
   `RUN_CPU_REQUEST` (250m) with a limit of 1 CPU.
 - README: acknowledgement line.
+- `report` is faster and needs less memory: the bootstrap replicates run on all CPU
+  cores (replicate `i` uses its own streams of the seed, so the result does not
+  depend on the thread count; the threads are limited to 1 GiB of resampling
+  buffers), and a result file is dropped after reading, keeping only the samples
+  and the context. On a 12-node mesh (2 against 2 rounds, 1.06 million samples):
+  156 s → 19 s; 85 MB → 25 MB on one thread. Results for a given seed differ
+  slightly from earlier versions.
 - `report --factor nic-settings`: the NIC ring sizes are the treatment, measured on the
   same nodes before and after a settings change; a changed kernel on a node is
   refused (exit 5) like a changed NIC family or CPU model,
