@@ -45,6 +45,7 @@ Annotations (`scheduling_jitter`, `pacing_overrun`, `netns_listen_drops`,
 | `node listener … sees no physical interface` | the node listener does not run with `hostNetwork` | start it with `hostNetwork` |
 | `--control-bind auto: no interface with an IPv4 default route` | unusual network setup | set `--control-bind` explicitly |
 | `Permission denied` on the report or result file | the working directory is not writable for the pod's UID | write to `/tmp` or a volume |
+| `CreateContainerError` … `image not known` | the image reference is a `sha256-…` tag (signature/attestation), not the image | use `digest: sha256:…` or a `sha-<commit>` tag |
 | `GLIBC_2.xx not found` | the dynamic build on an older host | use the static (`musl`) build |
 
 ## Reading a slow path

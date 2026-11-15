@@ -15,3 +15,8 @@ resources:
 images:
   - name: ghcr.io/git001/k8s-netmeasure-rs
     newTag: SET-ME
+    # Better, by digest (replace the newTag line), e.g.
+    #   digest: sha256:<64 hex digits>
+    # Never use a tag that starts with `sha256-`: those hold the signature, SBOM and
+    # provenance attestations, not the image (the container fails to start with
+    # "image not known").

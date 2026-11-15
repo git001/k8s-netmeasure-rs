@@ -70,10 +70,15 @@ or Ingress.
 | `listen/` | namespace `netmeasure`; service account `netmeasure-underlay` (OpenShift: may use SCC `hostnetwork-v2`); `listen` DaemonSets for underlay (hostNetwork) and overlay; a NetworkPolicy that lets only overlay `run` pods reach the overlay `listen` pods |
 | `run/` | a volume for result files; one `run` Job, overlay or underlay; a pod to fetch the files |
 
-1. Set the image in both `kustomization.yaml` (`newTag: SET-ME`; CI publishes
-   `sha-<12-char commit>` and release versions; a digest is better).
-2. Check, then apply the listen side:
+1. Set the image in both `kustomization.yaml`: `newTag: sha-<12-char commit>` (or a
+   release version), or better replace that line with `digest: sha256:<…>`. Tags
+   that start with `sha256-` hold the signature and attestations, not the image; a
+   pod using one fails with `CreateContainerError` … `image not known`.
+2. Create the namespace (a server dry run creates nothing, so without it every
+   namespaced object fails with `namespaces "netmeasure" not found`), check, then
+   apply the listen side:
    ```sh
+   oc apply -f deploy/examples/listen/namespace.yaml
    oc apply -k deploy/examples/listen --dry-run=server
    oc apply -k deploy/examples/listen
    oc -n netmeasure get pods -o wide
