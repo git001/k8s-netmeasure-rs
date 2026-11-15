@@ -136,14 +136,21 @@ fn semisynthetic() {
             );
         }
         for (e, &effect) in EFFECTS.iter().enumerate() {
+            // One worker per CPU: every split holds a scaled copy of half the data.
+            let workers = std::thread::available_parallelism().map_or(4, |n| n.get());
             let results: Vec<_> = std::thread::scope(|s| {
-                let hs: Vec<_> = (0..splits)
-                    .map(|i| {
+                let hs: Vec<_> = (0..workers)
+                    .map(|w| {
                         let nodes = &nodes;
-                        s.spawn(move || split(nodes, effect, (e * 100_000 + i) as u64))
+                        s.spawn(move || {
+                            (w..splits)
+                                .step_by(workers)
+                                .map(|i| split(nodes, effect, (e * 100_000 + i) as u64))
+                                .collect::<Vec<_>>()
+                        })
                     })
                     .collect();
-                hs.into_iter().map(|h| h.join().unwrap()).collect()
+                hs.into_iter().flat_map(|h| h.join().unwrap()).collect()
             });
             let mut t = Tally::default();
             for (iv, verdict) in results {
