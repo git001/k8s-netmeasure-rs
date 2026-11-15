@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after `PENDING_S` is given up with the scheduler's reason; run pods request
   `RUN_CPU_REQUEST` (250m) with a limit of 1 CPU.
 - README: acknowledgement line.
+- Mesh script: `NODES` restricts listeners and runs to named nodes (node affinity on
+  `metadata.name`, still DaemonSets), with a warning for a name that gets no
+  listener; `nodes` lists the candidates with zone and instance type; `inventory`
+  prints zone and instance type from the node labels.
 - `cargo xtask semisynthetic <dir>` (design §11): the semi-synthetic check on real
   result files. Runs of every node are split at random into two pseudo sides, a known
   factor (×1.0, ×1.1, ×1.3) is imposed on one, and the coverage and verdicts of the

@@ -3,6 +3,7 @@
 # manifests. See README.md next to this script and docs/user/05-kubernetes-openshift.md.
 #
 #   IMAGE=ghcr.io/git001/k8s-netmeasure-rs@sha256:<digest> ./mesh.sh deploy
+#   ./mesh.sh nodes                          # candidate nodes with zone and instance type
 #   ./mesh.sh inventory
 #   IMAGE=… ./mesh.sh series before 5        # 5 rounds, overlay and underlay alternating
 #   ./mesh.sh cleanup                        # jobs only; `cleanup --all` deletes the namespace
@@ -11,6 +12,8 @@
 #   IMAGE          image reference, preferably by digest (deploy, round, series)
 #   NODE_SELECTOR  extra node labels, comma-separated key=value (default: none);
 #                  node-role.kubernetes.io/worker="" is always required
+#   NODES          only these nodes, comma-separated node names (default: every node
+#                  matching NODE_SELECTOR); e.g. two per zone and machine type
 #   TOLERATIONS    JSON array of tolerations for tainted nodes (default: [])
 #   SAMPLES        counted samples per target and run (default: 1000)
 #   OUT            local result directory (default: ./mesh-results)
@@ -27,6 +30,7 @@ set -euo pipefail
 
 NS=netmeasure
 NODE_SELECTOR=${NODE_SELECTOR:-}
+NODES=${NODES:-}
 TOLERATIONS=${TOLERATIONS:-[]}
 SAMPLES=${SAMPLES:-1000}
 OUT=${OUT:-./mesh-results}
@@ -54,6 +58,33 @@ selector_json() {
   printf '{%s}' "$out"
 }
 
+# Node affinity on metadata.name for NODES; `null` removes an earlier one.
+affinity_json() {
+  local names=() n
+  IFS=',' read -ra names <<<"$NODES"
+  local values=''
+  for n in "${names[@]}"; do
+    [[ -z $n ]] && continue
+    values+="${values:+,}\"$n\""
+  done
+  if [[ -z $values ]]; then
+    printf 'null'
+  else
+    printf '{"nodeAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchFields":[{"key":"metadata.name","operator":"In","values":[%s]}]}]}}}' "$values"
+  fi
+}
+
+# Label selector for `oc get nodes`: worker role plus NODE_SELECTOR.
+selector_arg() {
+  printf 'node-role.kubernetes.io/worker%s' "${NODE_SELECTOR:+,$NODE_SELECTOR}"
+}
+
+# Candidates to pick NODES from: zone and instance type from the node labels.
+cmd_nodes() {
+  $OC get nodes -l "$(selector_arg)" \
+    -L topology.kubernetes.io/zone -L node.kubernetes.io/instance-type
+}
+
 cmd_deploy() {
   need_image
   $OC apply -f "$LISTEN_DIR/namespace.yaml"
@@ -61,12 +92,20 @@ cmd_deploy() {
     sed "s|image: ghcr.io/git001/k8s-netmeasure-rs.*|image: $IMAGE|" |
     $OC apply -f -
   local ds patch
-  patch="{\"spec\":{\"template\":{\"spec\":{\"nodeSelector\":$(selector_json),\"tolerations\":$TOLERATIONS}}}}"
+  patch="{\"spec\":{\"template\":{\"spec\":{\"nodeSelector\":$(selector_json),\"tolerations\":$TOLERATIONS,\"affinity\":$(affinity_json)}}}}"
   for ds in netmeasure-listen-underlay netmeasure-listen-overlay; do
     $OC -n "$NS" patch ds "$ds" --type=merge -p "$patch"
   done
   for ds in netmeasure-listen-underlay netmeasure-listen-overlay; do
     $OC -n "$NS" rollout status "ds/$ds" --timeout=300s
+  done
+  # A misspelt name, or a node NODE_SELECTOR or a taint excludes, gets no listener.
+  local n names=()
+  IFS=',' read -ra names <<<"$NODES"
+  for n in "${names[@]}"; do
+    [[ -z $n ]] && continue
+    listeners underlay | awk -v n="$n" '$1 == n {f = 1} END {exit !f}' ||
+      log "WARNING: no ready listener on '$n' (name, NODE_SELECTOR or taint?)"
   done
 }
 
@@ -86,13 +125,14 @@ listeners() {
 
 # One line per node: kernel, NIC drivers with ring sizes (raw JSON without jq).
 cmd_inventory() {
-  local node ip pod json
+  local node ip pod json labels
   while read -r node ip; do
     pod=$($OC -n "$NS" get pods -l app.kubernetes.io/component=listen-underlay \
       --field-selector "spec.nodeName=$node" -o name | head -n1)
     json=$($OC -n "$NS" exec "$pod" -- curl -s "http://$ip:17701/v1/context")
     if command -v jq >/dev/null; then
-      jq -r --arg node "$node" '[$node, .kernel_release.value,
+      labels=$($OC get node "$node" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}{" "}{.metadata.labels.node\.kubernetes\.io/instance-type}')
+      jq -r --arg node "$node" --arg labels "$labels" '[$node, ($labels | split(" ") | .[]), .kernel_release.value,
         ((.nic.value.interfaces // []) | map("\(.driver) \(.rings.rx // "-")/\(.rings.tx // "-")") | join(", "))]
         | @tsv' <<<"$json"
     else
@@ -273,9 +313,10 @@ cmd_cleanup() {
 
 case ${1:-} in
   deploy) cmd_deploy ;;
+  nodes) cmd_nodes ;;
   inventory) cmd_inventory ;;
   round) [[ $# -eq 4 ]] || die "usage: mesh.sh round overlay|underlay <phase> <round>"; cmd_round "$2" "$3" "$4" ;;
   series) [[ $# -eq 3 ]] || die "usage: mesh.sh series <phase> <rounds>"; cmd_series "$2" "$3" ;;
   cleanup) cmd_cleanup "${2:-}" ;;
-  *) die "usage: mesh.sh deploy | inventory | round <path> <phase> <n> | series <phase> <rounds> | cleanup [--all]" ;;
+  *) die "usage: mesh.sh nodes | deploy | inventory | round <path> <phase> <n> | series <phase> <rounds> | cleanup [--all]" ;;
 esac

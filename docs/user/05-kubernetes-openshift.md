@@ -160,7 +160,9 @@ For a before/after comparison across many nodes, hand-edited Jobs are error-pron
 listeners, finds their addresses itself, runs one Job per source node against every
 other node (overlay and underlay alternating), copies the result files out and
 cleans up. Node labels and tolerations for tainted nodes are passed as environment
-variables (`NODE_SELECTOR`, `TOLERATIONS`). Each node opens about 100 connections per
+variables (`NODE_SELECTOR`, `TOLERATIONS`); `NODES` restricts everything to named
+nodes, e.g. two per zone and machine type to see which NIC family each has (`nodes`
+lists the candidates with zone and instance type). Each node opens about 100 connections per
 second during a round (about 30 KB/s); a round takes about 2 min at 12 nodes.
 
 ```sh

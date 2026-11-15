@@ -21,7 +21,7 @@ export NODE_SELECTOR='type=example'                      # extra node labels, k=
 export TOLERATIONS='[{"key":"type","operator":"Equal","value":"example","effect":"NoSchedule"}]'
 
 deploy/examples/mesh/mesh.sh deploy              # namespace, listeners on every selected worker
-deploy/examples/mesh/mesh.sh inventory           # NIC family, driver, rings per node
+deploy/examples/mesh/mesh.sh inventory           # zone, instance type, kernel, NIC drivers and rings per node
 deploy/examples/mesh/mesh.sh series before 5     # 5 rounds, overlay and underlay alternating
 # … change (e.g. kernel), wait until every node is back …
 deploy/examples/mesh/mesh.sh deploy              # listeners again (new pods, new pod IPs)
@@ -29,6 +29,25 @@ deploy/examples/mesh/mesh.sh inventory           # NIC family unchanged per node
 deploy/examples/mesh/mesh.sh series after 5
 deploy/examples/mesh/mesh.sh cleanup --all       # delete the namespace
 ```
+
+### Only some nodes
+
+`NODES` restricts everything to the named nodes (comma-separated node names), e.g. two
+per zone and machine type to see which NIC family each has. `nodes` lists the
+candidates with their zone and instance type to pick from:
+
+```sh
+deploy/examples/mesh/mesh.sh nodes               # NAME … ZONE INSTANCE-TYPE
+export NODES=node-1a,node-1b,node-2a,node-2b,node-3a,node-3b
+deploy/examples/mesh/mesh.sh deploy              # listeners on these six only
+deploy/examples/mesh/mesh.sh inventory
+deploy/examples/mesh/mesh.sh series types 1      # optional: these nodes measure each other
+```
+
+The listeners stay DaemonSets; `NODES` becomes a node affinity on `metadata.name`, so
+every named node gets exactly one listener. A name that gets none (misspelt, excluded
+by `NODE_SELECTOR`, or a taint without toleration) is reported after `deploy`. Running
+`deploy` again without `NODES` returns to all selected nodes.
 
 `round <overlay|underlay> <phase> <n>` runs a single round. Results land in
 `$OUT/<phase>/<path>/round-<n>/<node>/` (`OUT` defaults to `./mesh-results`): the
@@ -39,6 +58,7 @@ with a `run.log` if the Job produced nothing).
 |---|---|---|
 | `IMAGE` | — | image reference, preferably by digest (required for `deploy`, `round`, `series`) |
 | `NODE_SELECTOR` | none | extra node labels, `key=value,…`; `node-role.kubernetes.io/worker` is always required |
+| `NODES` | all | only these nodes, comma-separated node names (node affinity on `metadata.name`) |
 | `TOLERATIONS` | `[]` | JSON array of tolerations for tainted nodes, for listeners and Jobs |
 | `SAMPLES` | `1000` | counted samples per target and run |
 | `OUT` | `./mesh-results` | local result directory |
