@@ -49,8 +49,29 @@ term per node), so every named node gets exactly one listener. `deploy` renders 
 listener manifests with a temporary kustomize overlay that already carries
 `NODE_SELECTOR`, `TOLERATIONS` and `NODES`, so the DaemonSets are never created on
 more nodes than selected. A name that gets none (misspelt, excluded
-by `NODE_SELECTOR`, or a taint without toleration) is reported after `deploy`. Running
-`deploy` again without `NODES` returns to all selected nodes.
+by `NODE_ROLE`/`NODE_SELECTOR`, or a taint without toleration) is reported after
+`deploy`. Running `deploy` again without `NODES` returns to all selected nodes.
+
+### Nodes other than workers (e.g. infra)
+
+Three things keep listeners off such nodes, and all three must be lifted:
+
+- the role: `NODE_ROLE=infra` (or `NODE_ROLE=` for none);
+- the cluster's default node selector, which OpenShift applies to every pod of a
+  project created without one: create the project with an empty selector,
+  `oc adm new-project netmeasure --node-selector=""` (an existing project: delete it
+  with `cleanup --all` first);
+- the nodes' taints (`oc get node <name> -o jsonpath='{.spec.taints}'`): matching
+  `TOLERATIONS`.
+
+```sh
+oc adm new-project netmeasure --node-selector=""
+export NODE_ROLE=infra NODES=… TOLERATIONS='[{"key":"node-role.kubernetes.io/infra","operator":"Exists","effect":"NoSchedule"}]'
+deploy/examples/mesh/mesh.sh deploy
+```
+
+Infra nodes carry the router, monitoring and registry: a mesh round adds little load
+(about 100 connections per second per node), but keep it short there.
 
 `round <overlay|underlay> <phase> <n>` runs a single round. Results land in
 `$OUT/<phase>/<path>/round-<n>/<node>/` (`OUT` defaults to `./mesh-results`): the
@@ -60,7 +81,8 @@ with a `run.log` if the Job produced nothing).
 | Variable | Default | Meaning |
 |---|---|---|
 | `IMAGE` | — | image reference, preferably by digest (required for `deploy`, `round`, `series`) |
-| `NODE_SELECTOR` | none | extra node labels, `key=value,…`; `node-role.kubernetes.io/worker` is always required |
+| `NODE_ROLE` | `worker` | required role label `node-role.kubernetes.io/<role>`, e.g. `infra`; empty (`NODE_ROLE=`) for no role requirement |
+| `NODE_SELECTOR` | none | extra node labels, `key=value,…` |
 | `NODES` | all | only these nodes, comma-separated node names (node affinity on `metadata.name`) |
 | `TOLERATIONS` | `[]` | JSON array of tolerations for tainted nodes, for listeners and Jobs |
 | `SAMPLES` | `1000` | counted samples per target and run |

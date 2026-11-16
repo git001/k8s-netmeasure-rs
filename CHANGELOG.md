@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after `PENDING_S` is given up with the scheduler's reason; run pods request
   `RUN_CPU_REQUEST` (250m) with a limit of 1 CPU.
 - README: acknowledgement line.
+- Mesh script: `NODE_ROLE` (default `worker`) sets the required role label; e.g.
+  `infra`, or empty for none. The README explains the three things that keep
+  listeners off other nodes (role, the project's default node selector, taints).
 - NIC statistics as diagnostics (milestone 6): `run` and `listen` read the
   `ethtool -S` counters of the physical interfaces (`ETHTOOL_GSSET_INFO`,
   `ETHTOOL_GSTRINGS`, `ETHTOOL_GSTATS`; buffers with room for a driver that grows

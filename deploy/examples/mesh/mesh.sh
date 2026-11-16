@@ -10,8 +10,9 @@
 #
 # Environment:
 #   IMAGE          image reference, preferably by digest (deploy, round, series)
-#   NODE_SELECTOR  extra node labels, comma-separated key=value (default: none);
-#                  node-role.kubernetes.io/worker="" is always required
+#   NODE_ROLE      required node role label node-role.kubernetes.io/<role>
+#                  (default: worker); e.g. infra, or empty for no role requirement
+#   NODE_SELECTOR  extra node labels, comma-separated key=value (default: none)
 #   NODES          only these nodes, comma-separated node names (default: every node
 #                  matching NODE_SELECTOR); e.g. two per zone and machine type
 #   TOLERATIONS    JSON array of tolerations for tainted nodes (default: [])
@@ -29,6 +30,7 @@
 set -euo pipefail
 
 NS=netmeasure
+NODE_ROLE=${NODE_ROLE-worker}
 NODE_SELECTOR=${NODE_SELECTOR:-}
 NODES=${NODES:-}
 TOLERATIONS=${TOLERATIONS:-[]}
@@ -46,14 +48,15 @@ log() { echo "mesh: $*" >&2; }
 die() { log "$*"; exit 1; }
 need_image() { [[ -n ${IMAGE:-} ]] || die "set IMAGE (e.g. ghcr.io/git001/k8s-netmeasure-rs@sha256:…)"; }
 
-# {"node-role.kubernetes.io/worker":"","key":"value",…}
+# {"node-role.kubernetes.io/<NODE_ROLE>":"","key":"value",…}
 selector_json() {
-  local out='"node-role.kubernetes.io/worker":""' kv kvs
+  local out='' kv kvs
+  if [[ -n $NODE_ROLE ]]; then out="\"node-role.kubernetes.io/$NODE_ROLE\":\"\""; fi
   IFS=',' read -ra kvs <<<"$NODE_SELECTOR"
   for kv in "${kvs[@]}"; do
     [[ -z $kv ]] && continue
     [[ $kv == *=* ]] || die "NODE_SELECTOR: '$kv' is not key=value"
-    out+=",\"${kv%%=*}\":\"${kv#*=}\""
+    out+="${out:+,}\"${kv%%=*}\":\"${kv#*=}\""
   done
   printf '{%s}' "$out"
 }
@@ -96,14 +99,17 @@ EOF
   $OC kustomize "$overlay" | sed "s|image: ghcr.io/git001/k8s-netmeasure-rs.*|image: $IMAGE|"
 }
 
-# Label selector for `oc get nodes`: worker role plus NODE_SELECTOR.
+# Label selector for `oc get nodes`: NODE_ROLE plus NODE_SELECTOR (may be empty).
 selector_arg() {
-  printf 'node-role.kubernetes.io/worker%s' "${NODE_SELECTOR:+,$NODE_SELECTOR}"
+  local role=${NODE_ROLE:+node-role.kubernetes.io/$NODE_ROLE}
+  printf '%s' "$role${role:+${NODE_SELECTOR:+,}}$NODE_SELECTOR"
 }
 
 # Candidates to pick NODES from: zone and instance type from the node labels.
 cmd_nodes() {
-  $OC get nodes -l "$(selector_arg)" \
+  local sel
+  sel=$(selector_arg)
+  $OC get nodes ${sel:+-l "$sel"} \
     -L topology.kubernetes.io/zone -L node.kubernetes.io/instance-type
 }
 
