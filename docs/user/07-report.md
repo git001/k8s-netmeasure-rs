@@ -11,12 +11,16 @@ k8s-netmeasure report --design sequential --factor kernel|nic-settings \
     --equivalence-margin 10% --equivalence-rationale "p99 within ±10 % is no change for us" \
     [--primary p99] [--quantiles p50,p90,p99] [--replicates 10000] [--seed N] \
     [--allow-context-mismatch nic_family,cpu_model,kernel_release]
+
+# NIC families in one data set, measured at the same time
+k8s-netmeasure report --design concurrent --factor nic --runs mesh-results/mixed \
+    [--reference-family <family>] [--equivalence-margin … --equivalence-rationale …]
 ```
 
 **State:** this version supports the sequential design (`before` on the same nodes,
-then `after`) with the factors `kernel` and `nic-settings`, NIC-family strata and text
-output. The concurrent design with crossover, the factors `nic` and `load` and JSON
-output *follow*. The
+then `after`) with the factors `kernel` and `nic-settings`, NIC-family strata, the
+concurrent design with the factor `nic`, and text output. Crossover, the factor `load`,
+the kernel × NIC interaction and JSON output *follow*. The
 statistical method is covered by unit tests and by the smoke grid of the simulation
 suite (8 synthetic scenarios with a known effect, run on every push); the full grid
 *follows*. On your own data, `cargo xtask semisynthetic <dir>` (in a checkout of the
@@ -28,11 +32,34 @@ The report header names what has validated the method.
 
 | Flag | Meaning |
 |---|---|
-| `--design sequential` | required; the result files must not overlap in wall-clock time (≤ 1 s), else exit 5 |
+| `--design` | required. `sequential`: the result files of the sides must not overlap in wall-clock time (≤ 1 s), else exit 5. `concurrent` (with `--factor nic`): the families' runs must share ≥ 80 % of their joint time span, else exit 5 |
 | `--factor` | required; what changed between the sides. `kernel`: kernel differences are expected, everything else is checked. `nic-settings`: ring sizes are expected to differ on the same nodes; a changed kernel on a node is refused (exit 5) like a changed NIC family or CPU model |
 | `--primary` | default `p99`: the **only** latency quantile that gets a verdict; the others are descriptive |
 | `--equivalence-margin` | `10%` (on the ratio after/before) or `50us` (on the difference); needs `--equivalence-rationale`. Without a margin the verdict is never `equivalent` |
 | `--before`, `--after` | files or directories (searched recursively; other JSON files are skipped) |
+| `--runs` | with `--factor nic`: one data set; the groups are the source nodes' observed NIC families |
+| `--reference-family` | with `--factor nic`: the family the others are compared with, as the report names it; default the first in alphabetical order |
+
+## Comparing NIC families (`--factor nic`)
+
+A NIC cannot be swapped between nodes, so the comparison is **observational**: a
+family comes with its host generation (instance type, CPU), and the report says so.
+Measure both families at the same time, with the same kernel, best in one mesh over
+nodes of both families (`mesh.sh` with `NODES`). Per path:
+
+- **send**: sources of family F against sources of the reference R on the same target
+  family X (`F → X` against `R → X`), so the other end stays the same;
+- **receive**: the same sources S on targets of both families (`S → F` against
+  `S → R`). Both sides come from the same runs; they are resampled independently,
+  which is conservative for this positive correlation.
+
+Every comparison has its own verdict and counts in k. Refused (exit 5): one family
+only, less than 80 % time overlap, different kernels (unless
+`--allow-context-mismatch kernel_release`), different load parameters. Evidence:
+`exploratory` below 3 nodes per family, `preliminary` from 3; `strong (observational)`
+needs ≥ 5 per family and a leave-one-node-out check that is not implemented yet. The
+local control compares the reference family's sources with the others' (another
+machine type shows here, not a change over time).
 
 **Measure both sides alike.** Within a path, every run of both sides must have the
 same `--interval`, loopback share, `--timeout` and topology; otherwise `report`

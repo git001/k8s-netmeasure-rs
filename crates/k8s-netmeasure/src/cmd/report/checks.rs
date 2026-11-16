@@ -50,14 +50,17 @@ impl Field {
 /// marks the fields the declared factor is about (§10.7 table).
 pub fn fields(before: &[&RunData], after: &[&RunData], declared: Factor) -> Vec<Field> {
     type Get = fn(&NodeContext) -> Option<String>;
-    let (kernel, nic) = (declared == Factor::Kernel, declared == Factor::NicSettings);
+    let kernel = declared == Factor::Kernel;
+    let rings_differ = declared != Factor::Kernel;
+    // `nic`: the family comes with its host generation (§10.7 table).
+    let host = declared == Factor::Nic;
     let list: [(&str, bool, Get); 7] = [
         ("kernel_release", kernel, |c| c.kernel_release.value.clone()),
         ("kernel_version", kernel, |c| c.kernel_version.value.clone()),
-        ("instance_type", false, |c| c.instance_type.value.clone()),
-        ("cpu_model", false, |c| c.cpu_model.value.clone()),
-        ("nic_family", false, |c| Some(family(c))),
-        ("nic_rings", nic, |c| Some(rings(c))),
+        ("instance_type", host, |c| c.instance_type.value.clone()),
+        ("cpu_model", host, |c| c.cpu_model.value.clone()),
+        ("nic_family", host, |c| Some(family(c))),
+        ("nic_rings", rings_differ, |c| Some(rings(c))),
         ("mtu", false, |c| c.mtu.value.map(|m| m.to_string())),
     ];
     let set = |rs: &[&RunData], get: Get| -> BTreeSet<String> {

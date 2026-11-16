@@ -16,12 +16,12 @@ use super::load::RunData;
 const VALIDATION: &str =
     "unit tests and the simulation smoke grid (§11, 8 scenarios); the full grid follows";
 
-pub fn header(args: &ReportArgs, plan: &Plan, overlap_ns: i128) {
+/// `validated`: what the time check found, e.g. "the sides overlap by 0.0 s".
+pub fn header(args: &ReportArgs, plan: &Plan, validated: &str) {
     println!("k8s-netmeasure report");
     println!(
-        "design: {} (validated: the sides overlap by {:.1} s)   factor: {}",
+        "design: {} (validated: {validated})   factor: {}",
         format!("{:?}", args.design).to_lowercase(),
-        overlap_ns as f64 / 1e9,
         args.factor.name()
     );
     let margin = match plan.margin {

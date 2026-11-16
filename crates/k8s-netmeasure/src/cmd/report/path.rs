@@ -22,6 +22,10 @@ impl<'a> Prepared<'a> {
         }
     }
 
+    pub fn of(runs: Vec<&'a RunData>) -> Self {
+        Prepared { runs }
+    }
+
     fn keys(&self) -> BTreeSet<&str> {
         self.runs
             .iter()
@@ -30,7 +34,7 @@ impl<'a> Prepared<'a> {
     }
 
     /// Source nodes as the top level, their runs below, for one stratum.
-    fn side(&self, stratum: &str) -> Side<'_> {
+    pub fn side(&self, stratum: &str) -> Side<'_> {
         let mut nodes: BTreeMap<&str, Vec<RunInput<'_>>> = BTreeMap::new();
         for r in &self.runs {
             if let Some(series) = r.strata.get(stratum) {
@@ -45,7 +49,7 @@ impl<'a> Prepared<'a> {
         }
     }
 
-    fn runs_with(&self, stratum: &str) -> Vec<&RunData> {
+    pub fn runs_with(&self, stratum: &str) -> Vec<&RunData> {
         self.runs
             .iter()
             .filter(|r| r.strata.contains_key(stratum))
@@ -53,7 +57,7 @@ impl<'a> Prepared<'a> {
             .collect()
     }
 
-    fn loopback(&self) -> Side<'_> {
+    pub fn loopback(&self) -> Side<'_> {
         let mut nodes: BTreeMap<&str, Vec<RunInput<'_>>> = BTreeMap::new();
         for r in &self.runs {
             nodes.entry(r.node.as_str()).or_default().push(RunInput {
@@ -82,7 +86,7 @@ pub fn strata(b: &Prepared, a: &Prepared) -> (Vec<String>, Vec<String>) {
 const BUFFER_BUDGET: usize = 1 << 30;
 
 /// `plan` with as many threads as the buffer budget allows, at least one.
-fn within_budget(plan: &Plan, b: &Side, a: &Side) -> Plan {
+pub fn within_budget(plan: &Plan, b: &Side, a: &Side) -> Plan {
     let n = |s: &Side| -> usize {
         s.runs()
             .flat_map(|r| &r.series.segments)

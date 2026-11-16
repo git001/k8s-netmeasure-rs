@@ -1,6 +1,7 @@
 //! `report` arguments (design §10.4–§10.7). Phase 1 so far: the sequential design
-//! with the factors `kernel` and `nic-settings`; the concurrent design, crossover,
-//! the factors `nic` and `load` and JSON output follow.
+//! with the factors `kernel` and `nic-settings`, and the concurrent design with the
+//! factor `nic` (one data set, groups by observed NIC family); crossover, the factor
+//! `load` and JSON output follow.
 
 use std::path::PathBuf;
 
@@ -10,6 +11,8 @@ use clap::{Args, ValueEnum};
 pub enum Design {
     /// Before and after on the same nodes, one after the other.
     Sequential,
+    /// The compared groups measured at the same time (`--factor nic`).
+    Concurrent,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -19,6 +22,9 @@ pub enum Factor {
     /// NIC settings (ring sizes) changed on the same nodes; the kernel and the NIC
     /// family must not change.
     NicSettings,
+    /// NIC families compared in one data set measured at the same time
+    /// (observational: the family comes with its host generation).
+    Nic,
 }
 
 impl Factor {
@@ -27,6 +33,7 @@ impl Factor {
         match self {
             Factor::Kernel => "kernel",
             Factor::NicSettings => "nic-settings",
+            Factor::Nic => "nic",
         }
     }
 }
@@ -40,13 +47,25 @@ pub enum MarginArg {
 
 #[derive(Debug, Clone, Args)]
 pub struct ReportArgs {
-    /// Result files or directories (searched recursively) of the reference side.
-    #[arg(long, env = "K8S_NETMEASURE_BEFORE", required = true, num_args = 1.., value_delimiter = ',')]
+    /// Result files or directories (searched recursively) of the reference side
+    /// (`kernel`, `nic-settings`).
+    #[arg(long, env = "K8S_NETMEASURE_BEFORE", required_unless_present = "runs",
+          conflicts_with = "runs", num_args = 1.., value_delimiter = ',')]
     pub before: Vec<PathBuf>,
 
-    /// Result files or directories of the side under test.
-    #[arg(long, env = "K8S_NETMEASURE_AFTER", required = true, num_args = 1.., value_delimiter = ',')]
+    /// Result files or directories of the side under test (`kernel`, `nic-settings`).
+    #[arg(long, env = "K8S_NETMEASURE_AFTER", required_unless_present = "runs",
+          conflicts_with = "runs", num_args = 1.., value_delimiter = ',')]
     pub after: Vec<PathBuf>,
+
+    /// One data set whose groups are the observed NIC families (`--factor nic`).
+    #[arg(long, env = "K8S_NETMEASURE_RUNS", num_args = 1.., value_delimiter = ',')]
+    pub runs: Vec<PathBuf>,
+
+    /// The family the others are compared with (`--factor nic`), as the report names
+    /// it (e.g. `drv-a+drv-b`). Default: the first in alphabetical order.
+    #[arg(long, env = "K8S_NETMEASURE_REFERENCE_FAMILY")]
+    pub reference_family: Option<String>,
 
     /// Study design, declared before the measurement (required).
     #[arg(long, env = "K8S_NETMEASURE_DESIGN", value_enum)]

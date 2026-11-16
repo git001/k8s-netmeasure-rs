@@ -180,3 +180,12 @@ the treatment:
 - With a declared margin, `equivalent` is possible. It shows that the families do not
   differ beyond the margin on these paths, the formal version of "same distribution
   on both NIC types".
+- **Implemented 2026-11-16:** `report --design concurrent --factor nic --runs <dir>
+  [--reference-family F]` (decided: one data set, groups by observed family; default
+  reference the first family alphabetically). Per path and other family F: *send*
+  `F → X` against `R → X` for every target family X, *receive* `S → F` against
+  `S → R` for S in {R, F}; each a verdict, k = their number. Refused: one family, time
+  overlap of the two groups' spans < 80 % (intersection over union), different
+  kernels unless allowed, different load parameters. `strong (observational)` is not
+  awarded yet (leave-one-node-out stability not implemented); the same-target-set and
+  rebooted conditions are not checked either.

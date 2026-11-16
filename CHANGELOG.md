@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after `PENDING_S` is given up with the scheduler's reason; run pods request
   `RUN_CPU_REQUEST` (250m) with a limit of 1 CPU.
 - README: acknowledgement line.
+- `report --design concurrent --factor nic --runs <dir> [--reference-family F]`:
+  NIC families compared in one data set measured at the same time (design §10.7).
+  Per path *send* (other family's sources against the reference's on the same target
+  family) and *receive* (the same sources on targets of both families), each with a
+  verdict; refused for one family, < 80 % time overlap, different kernels or load
+  parameters; observational evidence labels; context per family.
 - Mesh script: `NODE_ROLE` (default `worker`) sets the required role label; e.g.
   `infra`, or empty for none. The README explains the three things that keep
   listeners off other nodes (role, the project's default node selector, taints).
