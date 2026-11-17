@@ -55,8 +55,10 @@ around **every cycle**, not only in the run's context:
 - per physical interface: present or not, the bound driver (`readlink
   /sys/class/net/<if>/device/driver`) and the RX/TX ring sizes (`ETHTOOL_GRINGPARAM`,
   added in the milestone 2 review: a ring resize, e.g. by a tuning daemon, changes the
-  path's queueing), plus which interface carries the default route; a few
-  `readlink`/`stat` calls and one `ioctl` per interface, cheap enough for every cycle;
+  path's queueing), since milestone 6 also driver version, firmware and channels
+  (`ETHTOOL_GDRVINFO`, `ETHTOOL_GCHANNELS`), plus which interface carries the default
+  route; a few `readlink`/`stat` calls and three `ioctl`s per interface, cheap enough
+  for every cycle;
 - observed directly in the underlay; in the overlay through the node listener
   (`--node-context-from`, §5), whose `/v1/snapshot` carries the same fields;
 - if the node listener cannot be reached for a cycle, the NIC path of that cycle is

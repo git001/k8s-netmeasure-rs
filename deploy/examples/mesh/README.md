@@ -21,7 +21,7 @@ export NODE_SELECTOR='type=example'                      # extra node labels, k=
 export TOLERATIONS='[{"key":"type","operator":"Equal","value":"example","effect":"NoSchedule"}]'
 
 deploy/examples/mesh/mesh.sh deploy              # namespace, listeners on every selected worker
-deploy/examples/mesh/mesh.sh inventory           # zone, instance type, kernel, NIC drivers and rings per node
+deploy/examples/mesh/mesh.sh inventory           # zone, instance type, kernel, NIC drivers, rings and channels per node
 deploy/examples/mesh/mesh.sh series before 5     # 5 rounds, overlay and underlay alternating
 # … change (e.g. kernel), wait until every node is back …
 deploy/examples/mesh/mesh.sh deploy              # listeners again (new pods, new pod IPs)
@@ -29,6 +29,11 @@ deploy/examples/mesh/mesh.sh inventory           # NIC family unchanged per node
 deploy/examples/mesh/mesh.sh series after 5
 deploy/examples/mesh/mesh.sh cleanup --all       # delete the namespace
 ```
+
+`inventory` prints per physical interface `driver rx/tx` (current ring sizes) and,
+when the driver has combined channels, `q<current>/<max>` (`ethtool -l`), e.g.
+`drv-a 1024/1024 q16/32`. Driver version and firmware are in each listener's
+`/v1/context` (`nic.value.interfaces[].driver_info`).
 
 ### Only some nodes
 

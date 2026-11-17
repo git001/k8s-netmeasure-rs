@@ -12,6 +12,7 @@ mod fmt;
 mod load;
 mod nic;
 mod nic_compare;
+mod nicinfo;
 mod params;
 mod path;
 mod strata;

@@ -156,7 +156,7 @@ cmd_inventory() {
     if command -v jq >/dev/null; then
       labels=$($OC get node "$node" -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}{" "}{.metadata.labels.node\.kubernetes\.io/instance-type}')
       jq -r --arg node "$node" --arg labels "$labels" '[$node, ($labels | split(" ") | .[]), .kernel_release.value,
-        ((.nic.value.interfaces // []) | map("\(.driver) \(.rings.rx // "-")/\(.rings.tx // "-")") | join(", "))]
+        ((.nic.value.interfaces // []) | map("\(.driver) \(.rings.rx // "-")/\(.rings.tx // "-")\(if .channels.combined then " q\(.channels.combined)/\(.channels.combined_max)" else "" end)") | join(", "))]
         | @tsv' <<<"$json"
     else
       printf '%s %s\n' "$node" "$json"

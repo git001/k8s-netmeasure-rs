@@ -7,11 +7,11 @@ use std::path::Path;
 use netmeasure_core::diag::cgroup as cg;
 use netmeasure_core::diag::cpuinfo;
 use netmeasure_core::schema::control::NodeContext;
-use netmeasure_core::schema::nic::{Interface, NicPath, RingSizes};
+use netmeasure_core::schema::nic::{Channels, DriverInfo, Interface, NicPath, RingSizes};
 use netmeasure_core::schema::sourced::Sourced;
 
 use super::{cgroup, net, read};
-use crate::sys::ethtool;
+use crate::sys::{ethtool, ethtool_info};
 
 /// Values the operator declares (Phase 1 has no API access, §5).
 #[derive(Debug, Clone, Default)]
@@ -107,11 +107,26 @@ fn interface(name: &str, dir: &Path) -> Interface {
         ),
         Err(e) => (None, Some(e)),
     };
+    let (driver_info, driver_info_errno) = match ethtool_info::driver_info(name) {
+        Ok(d) => (
+            Some(DriverInfo::from_raw(&d.version, &d.firmware, &d.bus)),
+            None,
+        ),
+        Err(e) => (None, Some(e)),
+    };
+    let (channels, channels_errno) = match ethtool_info::channels(name) {
+        Ok(c) => (Some(Channels::from_raw(c)), None),
+        Err(e) => (None, Some(e)),
+    };
     Interface {
         name: name.to_owned(),
         driver,
         rings,
         rings_errno,
+        driver_info,
+        driver_info_errno,
+        channels,
+        channels_errno,
     }
 }
 
@@ -141,6 +156,11 @@ mod tests {
         assert_eq!(i.name, "nm-phys0");
         assert_eq!(i.driver, None, "no driver link");
         assert_eq!((i.rings, i.rings_errno), (None, Some(libc::ENODEV)));
+        assert_eq!(
+            (&i.driver_info, i.driver_info_errno),
+            (&None, Some(libc::ENODEV))
+        );
+        assert_eq!((i.channels, i.channels_errno), (None, Some(libc::ENODEV)));
     }
 
     #[test]

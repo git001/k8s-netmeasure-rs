@@ -8,6 +8,7 @@ use netmeasure_cli::report::Factor;
 use netmeasure_core::schema::control::NodeContext;
 
 use super::load::RunData;
+use super::nicinfo;
 
 /// Overlap allowed in the sequential design: a clock step after a reboot (§10.6).
 const MAX_OVERLAP_NS: i128 = 1_000_000_000;
@@ -54,13 +55,15 @@ pub fn fields(before: &[&RunData], after: &[&RunData], declared: Factor) -> Vec<
     let rings_differ = declared != Factor::Kernel;
     // `nic`: the family comes with its host generation (§10.7 table).
     let host = declared == Factor::Nic;
-    let list: [(&str, bool, Get); 7] = [
+    let list: [(&str, bool, Get); 9] = [
         ("kernel_release", kernel, |c| c.kernel_release.value.clone()),
         ("kernel_version", kernel, |c| c.kernel_version.value.clone()),
         ("instance_type", host, |c| c.instance_type.value.clone()),
         ("cpu_model", host, |c| c.cpu_model.value.clone()),
         ("nic_family", host, |c| Some(family(c))),
-        ("nic_rings", rings_differ, |c| Some(rings(c))),
+        ("nic_driver", kernel || host, |c| Some(nicinfo::driver(c))),
+        ("nic_rings", rings_differ, |c| Some(nicinfo::rings(c))),
+        ("nic_channels", rings_differ, |c| Some(nicinfo::channels(c))),
         ("mtu", false, |c| c.mtu.value.map(|m| m.to_string())),
     ];
     let set = |rs: &[&RunData], get: Get| -> BTreeSet<String> {
@@ -82,7 +85,8 @@ pub fn fields(before: &[&RunData], after: &[&RunData], declared: Factor) -> Vec<
 type NodeGet = fn(&NodeContext) -> String;
 
 /// Per node: the NIC family (drivers of the physical interfaces) or CPU model must
-/// not change between the sides (§10.6), with `nic-settings` not the kernel either.
+/// not change between the sides (§10.6), with `nic-settings` neither the kernel nor
+/// the driver version and firmware (§10.7 table).
 /// Returns `(field, node, before, after)`.
 pub fn node_mismatches(
     before: &[&RunData],
@@ -113,6 +117,7 @@ pub fn node_mismatches(
                 .clone()
                 .unwrap_or_else(|| "unknown".into())
         }));
+        checks.push(("nic_driver", nicinfo::driver));
     }
     for (name, get) in checks {
         let (b, a) = (per_node(before, get), per_node(after, get));
@@ -142,31 +147,4 @@ pub fn family(c: &NodeContext) -> String {
             d.into_iter().collect::<Vec<_>>().join("+")
         }
     }
-}
-
-fn rings(c: &NodeContext) -> String {
-    match &c.nic.value {
-        None => "unknown".into(),
-        Some(p) => {
-            let mut v: Vec<String> = p
-                .interfaces
-                .iter()
-                .map(|i| match &i.rings {
-                    Some(r) => format!(
-                        "{}:{}/{}",
-                        i.driver.as_deref().unwrap_or("-"),
-                        opt(r.rx),
-                        opt(r.tx)
-                    ),
-                    None => format!("{}:-", i.driver.as_deref().unwrap_or("-")),
-                })
-                .collect();
-            v.sort();
-            v.join(" ")
-        }
-    }
-}
-
-fn opt(v: Option<u32>) -> String {
-    v.map_or("-".into(), |x| x.to_string())
 }

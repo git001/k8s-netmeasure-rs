@@ -10,7 +10,7 @@ k8s-netmeasure report --design sequential --factor kernel|nic-settings \
     --before mesh-results/before --after mesh-results/after \
     --equivalence-margin 10% --equivalence-rationale "p99 within ±10 % is no change for us" \
     [--primary p99] [--quantiles p50,p90,p99] [--replicates 10000] [--seed N] \
-    [--allow-context-mismatch nic_family,cpu_model,kernel_release]
+    [--allow-context-mismatch nic_family,cpu_model,kernel_release,nic_driver]
 
 # NIC families in one data set, measured at the same time
 k8s-netmeasure report --design concurrent --factor nic --runs mesh-results/mixed \
@@ -33,7 +33,7 @@ The report header names what has validated the method.
 | Flag | Meaning |
 |---|---|
 | `--design` | required. `sequential`: the result files of the sides must not overlap in wall-clock time (≤ 1 s), else exit 5. `concurrent` (with `--factor nic`): the families' runs must share ≥ 80 % of their joint time span, else exit 5 |
-| `--factor` | required; what changed between the sides. `kernel`: kernel differences are expected, everything else is checked. `nic-settings`: ring sizes are expected to differ on the same nodes; a changed kernel on a node is refused (exit 5) like a changed NIC family or CPU model |
+| `--factor` | required; what changed between the sides. `kernel`: kernel differences are expected, everything else is checked. `nic-settings`: ring sizes and channels are expected to differ on the same nodes; a changed kernel, driver version or firmware on a node is refused (exit 5) like a changed NIC family or CPU model |
 | `--primary` | default `p99`: the **only** latency quantile that gets a verdict; the others are descriptive |
 | `--equivalence-margin` | `10%` (on the ratio after/before) or `50us` (on the difference); needs `--equivalence-rationale`. Without a margin the verdict is never `equivalent` |
 | `--before`, `--after` | files or directories (searched recursively; other JSON files are skipped) |
@@ -112,7 +112,10 @@ rationale down: chosen afterwards, they can be fitted to the result.
 - `between-run spread`: the primary quantile of every run; if it is wide, more runs
   help more than more samples per run.
 - `context, not verdict`: kernel, instance type (declared), CPU model, NIC family,
-  ring sizes and MTU of both sides, one `both:` line when they agree,
+  driver version and firmware (`nic_driver`; an in-tree driver reports the kernel
+  release as its version, so it changes with the kernel), ring sizes, channels
+  (`nic_channels`, current/max, `ethtool -l`) and MTU of both sides (`unknown` for
+  result files written before a field was recorded), one `both:` line when they agree,
   `before:`/`after:` when they differ. `!` marks a difference outside the declared
   factor. A changed NIC family or CPU model **on the same node** refuses the comparison (exit 5), because the node
   then measures another host; `--allow-context-mismatch` accepts it, printed.

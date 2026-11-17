@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- NIC driver info and channels (milestone 6): per physical interface the driver
+  version, firmware and bus address (`ETHTOOL_GDRVINFO`) and the channel counts,
+  current and maximum (`ETHTOOL_GCHANNELS`), in the node context and the NIC path
+  checked around every cycle (`driver_info`, `channels`, each with an `_errno`;
+  absent in older result files, which still parse). `report` lists `nic_driver` and
+  `nic_channels` in the context; with `--factor nic-settings` channels belong to the
+  treatment and a changed driver version or firmware on a node is refused (exit 5,
+  `--allow-context-mismatch nic_driver` accepts it). `mesh.sh inventory` shows the
+  combined channels as `q<current>/<max>`. A run and its listeners must use the same
+  image: an older binary rejects the new fields.
 - `report` (first step of milestone 5): compares `--before` and `--after` result
   files in the sequential design with the factor `kernel`. Per path one verdict on
   the declared primary quantile (default p99) with an equivalence margin and its

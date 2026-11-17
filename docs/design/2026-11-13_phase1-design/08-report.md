@@ -94,7 +94,7 @@ the treatment:
 
 | `--factor` | Must differ between the sides | Allowed to differ, printed as a known confound | Everything else |
 |---|---|---|---|
-| `kernel` | kernel release / build | — | must match |
+| `kernel` | kernel release / build (and the driver version of in-tree drivers, which is the kernel release) | — | must match |
 | `nic` | NIC model, driver, driver version, firmware | instance type and CPU model (host generation); printed with the check below | must match, including the kernel |
 | `nic-settings` | the changed NIC settings (ring sizes, channels, …) | — | must match, including NIC model, driver and firmware |
 | `load` | load parameters | — | must match |

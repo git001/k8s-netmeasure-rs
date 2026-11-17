@@ -86,7 +86,7 @@ or Ingress.
    The overlay pods restart until the underlay pod on their node is ready: they
    refuse to start without their node listener.
 3. Take the NIC inventory: `/v1/context` of every underlay `listen` lists its node's
-   NIC family, driver and rings. Choose source and target nodes from it. Query from
+   NIC family, driver, driver version, firmware, rings and channels. Choose source and target nodes from it. Query from
    inside the pod, at the node IP (the control port is bound there, not on
    `localhost`); the image has `curl`, `jq` runs locally:
    ```sh

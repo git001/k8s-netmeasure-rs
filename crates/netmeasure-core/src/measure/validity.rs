@@ -163,6 +163,10 @@ mod tests {
                 driver: Some(driver.into()),
                 rings: None,
                 rings_errno: None,
+                driver_info: None,
+                driver_info_errno: None,
+                channels: None,
+                channels_errno: None,
             }],
         }
     }

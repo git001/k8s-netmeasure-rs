@@ -105,9 +105,10 @@ pub struct ReportArgs {
     pub seed: Option<u64>,
 
     /// Context differences to accept instead of refusing (exit 5), comma-separated:
-    /// `nic_family`, `cpu_model`, `kernel_release` (refused only with `nic-settings`).
+    /// `nic_family`, `cpu_model`, `kernel_release` and `nic_driver` (driver version and
+    /// firmware; both refused only with `nic-settings`).
     #[arg(long, env = "K8S_NETMEASURE_ALLOW_CONTEXT_MISMATCH", value_delimiter = ',',
-          value_parser = ["nic_family", "cpu_model", "kernel_release"])]
+          value_parser = ["nic_family", "cpu_model", "kernel_release", "nic_driver"])]
     pub allow_context_mismatch: Vec<String>,
 
     #[command(flatten)]

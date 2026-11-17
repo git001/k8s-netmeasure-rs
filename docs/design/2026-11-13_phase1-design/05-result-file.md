@@ -135,7 +135,14 @@ nodes), `somaxconn`, `tcp_syn_retries`,
 **Ring sizes** (current and maximum, RX and TX, via `SIOCETHTOOL`/`ETHTOOL_GRINGPARAM`,
 no capability needed) are in the node facts since the milestone 2 review: hosts
 behind the same instance type were seen with different TX ring sizes per NIC family.
-A direction whose maximum the driver reports as 0 is `null` (`ethtool -g`: `n/a`). In a
+A direction whose maximum the driver reports as 0 is `null` (`ethtool -g`: `n/a`).
+**Driver version, firmware and bus address** (`ETHTOOL_GDRVINFO`, `driver_info`) and the
+**channels** (current and maximum rx, tx, other, combined; `ETHTOOL_GCHANNELS`,
+`channels`) are recorded since milestone 6: a vendor's tuning advice names the queue
+count (a driver may activate fewer queues than it supports), and a firmware update
+changes the path like a driver update. A kind whose maximum is 0 is `null`; each has
+an `_errno` field like the rings; both fields are absent in files written earlier,
+which still parse. In a
 pod network namespace no physical interface is visible; the underlay view comes from
 a `hostNetwork` process (§5, node listener).
 
